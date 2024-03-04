@@ -11,6 +11,11 @@ This project is a proof of concept. Please be aware that the use of self bots is
 - List server members with mutual friends.
 - List server members with mutual servers.
 
+## Coming Soon
+
+- Windows .exe and Mac .app
+- Connections graph
+
 ## Limitations
 
 - If a server has more than 1000 members, this program is only able to retrieve
