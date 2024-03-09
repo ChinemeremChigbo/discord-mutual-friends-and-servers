@@ -6,7 +6,7 @@ from tkinter import ttk
 
 from get_token import get_token
 from main import MyClient
-
+import threading
 
 class Colors:
     # Define color codes
@@ -385,27 +385,151 @@ def get_arguments():
     root.mainloop()
     return args
 
+class LoadingScreen:
+    def __init__(self):
+        self.root = tk.Tk()  # Changed back to Tk() to make it the primary window
+        self.root.title("Loading")
+        self.configure_window()
+        self.add_loading_message()
+        self.root.withdraw()  # Initially hide the window
+        self.configure_styles()  # Configure styles for the UI
+
+    def configure_window(self):
+        self.root.geometry("350x475")  # Window size
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x = (screen_width / 2) - (350/2)
+        y = (screen_height / 2) - (475/2)
+        self.root.geometry(f"+{int(x)}+{int(y)}")
+        self.root.configure(bg=Colors.BG_COLOR)  # Set the window background color
+
+    def add_loading_message(self):
+        # Store the label in an attribute so it can be updated later
+        self.message_label = tk.Label(self.root, text="Loading, please wait...", bg=Colors.BG_COLOR, fg=Colors.FG_COLOR)
+        self.message_label.pack(expand=True)
+
+    def configure_styles(self):
+        style = ttk.Style()
+        style.configure("TFrame", background=Colors.BG_COLOR)
+        style.configure("TLabel", foreground=Colors.FG_COLOR, background=Colors.BG_COLOR, font=("Helvetica", 12))
+        style.configure("TCheckbutton", foreground=Colors.BG_COLOR, background=Colors.BG_COLOR, font=("Helvetica", 12))
+        style.configure("TButton", foreground=Colors.BLACK, background=Colors.ENTRY_BG_COLOR, font=("Helvetica", 12))
+
+    def show(self):
+        self.root.deiconify()  # Show the window
+
+    def close(self):
+        self.root.destroy()  # Close the windo    
+        
+
+    def update_message(self, message, fg_color=Colors.FG_COLOR):
+            self.message_label.config(text=message, fg=fg_color)  # Update the label with the new message and foreground color
+
+
+def run_client(args, loading_screen):
+    try:
+        client = MyClient(
+            sleep_time=args["sleep_time"],
+            output_verbosity=args["output_verbosity"],
+            print_info=args["print_info"],
+            write_to_json=args["write_to_json"],
+            output_path=args["output_path"],
+            include_servers=args["include_servers"],
+        )
+        client.run(args["token"])
+    except Exception as e:
+        loading_screen.update_message("Token validation failed.", Colors.FG_COLOR)
+        # Optionally log the exception or perform other error handling here
+        print(f"Error running client: {e}")
+    finally:
+        # Ensure the loading screen is closed only if the client runs successfully
+        loading_screen.close()  # Close the loading screen
+        
+
+def on_client_complete():
+    # Now, initiate the JSON viewer window
+    json_viewer_root = tk.Tk()  # Start a new Tkinter instance for the JSON viewer
+    json_files = [os.path.join(output_path, f) for f in os.listdir(output_path) if f.endswith('.json')]
+    JsonViewer(json_viewer_root, json_files)
+    json_viewer_root.mainloop()  # Start the Tkinter loop for the JSON viewer
+
+class JsonViewer:
+    def __init__(self, master, files):
+        self.master = master
+        self.master.title("JSON File Viewer")
+        self.files = files
+        self.configure_window()
+        self.create_widgets()
+        self.configure_styles()
+    
+    def configure_window(self):
+        # Similar geometry and background configuration as LoadingScreen
+        self.master.geometry("350x475")  # Adjust the size as needed
+        screen_width = self.master.winfo_screenwidth()
+        screen_height = self.master.winfo_screenheight()
+        x = (screen_width / 2) - (350/2)  # Adjust the offset as needed
+        y = (screen_height / 2) - (475/2)  # Adjust the offset as needed
+        self.master.geometry(f"+{int(x)}+{int(y)}")
+        self.master.configure(bg=Colors.BG_COLOR)  # Use the same background color
+    
+    def configure_styles(self):
+        # Apply similar styles for consistency
+        style = ttk.Style()
+        style.configure("TFrame", background=Colors.BG_COLOR)
+        style.configure("TLabel", foreground=Colors.FG_COLOR, background=Colors.BG_COLOR, font=("Helvetica", 12))
+        style.configure("TButton", foreground=Colors.BLACK, background=Colors.ENTRY_BG_COLOR, font=("Helvetica", 12))
+        # For Text widget, which doesn't use ttk.Style, configure directly
+        self.text.config(bg=Colors.BG_COLOR, fg=Colors.FG_COLOR, font=("Helvetica", 12))
+
+    def create_widgets(self):
+        # Create a frame to contain the text widget and scrollbars
+        text_frame = tk.Frame(self.master, bg=Colors.BG_COLOR)
+        text_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Create the text widget with scrollbars inside the frame
+        self.text = tk.Text(text_frame, wrap=tk.NONE, width=80, height=20, 
+                            bg=Colors.BG_COLOR, fg=Colors.FG_COLOR, font=("Helvetica", 12),
+                            xscrollcommand=lambda *args: h_scrollbar.set(*args),
+                            yscrollcommand=lambda *args: v_scrollbar.set(*args))
+        self.text.grid(row=0, column=0, sticky='nsew')  # Use grid for better control
+
+        # Vertical scrollbar
+        v_scrollbar = tk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.text.yview)
+        v_scrollbar.grid(row=0, column=1, sticky='ns')
+
+        # Horizontal scrollbar
+        h_scrollbar = tk.Scrollbar(text_frame, orient=tk.HORIZONTAL, command=self.text.xview)
+        h_scrollbar.grid(row=1, column=0, sticky='ew')
+
+        # Configure grid row/column weights in the frame
+        text_frame.grid_rowconfigure(0, weight=1)
+        text_frame.grid_columnconfigure(0, weight=1)
+
+        # Insert JSON file content
+        for file_path in self.files:
+            with open(file_path, 'r') as file:
+                content = file.read()
+                self.text.insert(tk.END, f"File: {file_path}\n{content}\n\n")
 
 if __name__ == "__main__":
-    # Set the default output path to the current working directory + /output/
+    # Set the default output path and initialize logging
     output_path = os.path.dirname(os.path.realpath(__file__)) + "/output/"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    args = get_arguments()
+    args = get_arguments()  # This needs to be adjusted to actually return args from the UI
     if args.get("get_token", False):
         args["token"] = get_token()
     logging.basicConfig(level=args["loglevel"].upper())
+    if "TOKEN" in os.environ:
+        del os.environ["TOKEN"]
 
-    key = "TOKEN"
-    if key in os.environ:
-        del os.environ[key]
+    # Show the loading screen
+    loading_screen = LoadingScreen()
+    loading_screen.show()
 
-    client = MyClient(
-        sleep_time=args["sleep_time"],
-        output_verbosity=args["output_verbosity"],
-        print_info=args["print_info"],
-        write_to_json=args["write_to_json"],
-        output_path=args["output_path"],
-        include_servers=args["include_servers"],
-    )
-    client.run(args["token"])
+    # Start the client in a background thread
+    client_thread = threading.Thread(target=run_client, args=(args, loading_screen))
+    client_thread.start()
+
+    # Start the Tkinter loop for the loading screen
+    loading_screen.root.mainloop()
+    on_client_complete()
