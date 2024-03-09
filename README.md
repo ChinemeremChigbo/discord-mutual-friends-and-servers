@@ -19,7 +19,7 @@ This project is a proof of concept. Please be aware that the use of self bots is
 ## Limitations
 
 - If a server has more than 1000 members, this program is only able to retrieve
-  the currently online member (unless you have the required permissions to
+  the currently online members (unless you have the required permissions to
   request all server members)
 
 ## Requirements
@@ -32,14 +32,14 @@ This project is a proof of concept. Please be aware that the use of self bots is
 1. Install all project [Requirements](#requirements)
 2. Get your Discord token using the steps in the [How to Get Your Token](#how-to-get-your-token) section
 3. Put your Discord token into `.env.sample` file
-4. Rename the file from `.env.sample` to `.env`
-5. Install the requirements using the following code snippet:
+4. Rename the file `.env.sample` to `.env`
+5. Install the requirements using the following command:
 
    ```bash
    python3 -m pip install -r requirements.txt
    ```
 
-6. Run the main Python file with or customize your command with the options in the [Command-line Options](#command-line-options) section:
+6. Run the main Python file with the command below, or customize the command with the options in the [Command-line Options](#command-line-options) section:
 
    ```bash
    python3 main.py
@@ -49,7 +49,7 @@ This project is a proof of concept. Please be aware that the use of self bots is
 
 ### Primary Method
 
-If you are comfortable running JavaScript in the Developer Tools Console the following method is the easiest:
+If you are comfortable running JavaScript in the Developer Tools Console, the following method is the easiest:
 
 1. Login to Discord's web app: [Discord](https://discordapp.com/)
 2. Go to your browser's Developer Tools. In most browsers this can be done by pressing `⌘ + Option + I` on macOS or `CTRL+ Shift + I` on Windows or Linux. `F12` may also work.
@@ -61,7 +61,7 @@ If you are comfortable running JavaScript in the Developer Tools Console the fol
 
 ### Other Methods
 
-Other Methods that doen't involve running JavaScript in the console
+Other methods that don't involve running JavaScript in the console:
 
 - [From the requests tab](https://gist.github.com/MarvNC/e601f3603df22f36ebd3102c501116c6)
 - [From local storage](https://www.androidauthority.com/get-discord-token-3149920/)
