@@ -8,6 +8,9 @@ from selenium.webdriver.support import expected_conditions as EC
 import tkinter as tk
 from tkinter import ttk
 
+import subprocess
+import sys
+
 
 def get_username_password():
     def center_window(root, width=350, height=475):
@@ -20,6 +23,11 @@ def get_username_password():
         y = (screen_height / 2) - (height / 2)
 
         root.geometry("%dx%d+%d+%d" % (width, height, x, y))
+
+    def go_back():
+        # Run ui.py and close the current window
+        subprocess.Popen(['python', 'ui.py'])  # Adjust the path to ui.py if necessary
+        sys.exit()  # Exit the script
 
     def submit():
         # Retrieve entered values
@@ -113,6 +121,15 @@ def get_username_password():
     )
 
     submit_btn.pack()
+
+    # Add a "Back" button
+    back_btn = ttk.Button(
+        content_frame,
+        text="Back",
+        command=go_back,  # Bind the go_back function to the button
+        style="Custom.TButton",
+    )
+    back_btn.pack(pady=(0, 20))
 
     root.mainloop()
 
