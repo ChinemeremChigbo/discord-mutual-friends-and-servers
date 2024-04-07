@@ -199,16 +199,10 @@ def get_arguments():
     root.resizable(True, True)
 
     # if tk.TkVersion >= 8.6:
-    #     icon_path = resource_path(
-    #         "icon.png"
-    #     )  # Use resource_path to get the correct path
-    #     root.iconphoto(
-    #         True, tk.PhotoImage(file=icon_path)
-    #     )  # For Linux and newer versions of Windows
+    #     icon_path = resource_path("icon.png")  # Use resource_path to get the correct path
+    #     root.iconphoto(True, tk.PhotoImage(file=icon_path))  # For Linux and newer versions of Windows
     # else:
-    #     icon_path = resource_path(
-    #         "icon.ico"
-    #     )  # Use resource_path to get the correct path
+    #     icon_path = resource_path("icon.ico")  # Use resource_path to get the correct path
     #     root.iconbitmap(default=icon_path)  # For older versions of Windows
 
     args = {}
@@ -473,6 +467,7 @@ class LoadingScreen:
         self.add_loading_message()
         self.root.withdraw()  # Initially hide the window
         self.configure_styles()  # Configure styles for the UI
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def configure_window(self):
         self.root.geometry("350x475")  # Window size
@@ -519,7 +514,13 @@ class LoadingScreen:
         self.root.deiconify()  # Show the window
 
     def close(self):
-        self.root.destroy()  # Close the windo
+        self.root.destroy()  # Close the window
+    
+    def on_close(self):
+        """This method is called when the window is closed."""
+        self.close()
+        # Then exit the application
+        self.root.quit()  # Ensure the entire application stops running
 
     def update_message(self, message, fg_color=Colors.FG_COLOR):
         self.message_label.config(
@@ -664,9 +665,10 @@ class MyClient(discord.Client):
         mutual_servers: dict,
         output_path: str,
     ) -> None:
+        resolved_output_path = resource_path(output_path)
         os.makedirs(
-            output_path, exist_ok=True
-        )  # Create the directory if it doesn't exist
+            resolved_output_path, exist_ok=True
+        )  # Ensure the directory is created at the resolved path
 
         file_names = [
             (server_info, "server_info.json"),
@@ -676,8 +678,11 @@ class MyClient(discord.Client):
         ]
 
         for input_dictionary, file_name in file_names:
+            file_path = os.path.join(
+                resolved_output_path, file_name
+            )  # Resolve each file's path
             with open(
-                os.path.join(output_path, file_name), "w"
+                file_path, "w"
             ) as fp:  # Use os.path.join for proper path handling
                 json.dump(input_dictionary, fp, indent=4)
 
@@ -991,14 +996,15 @@ class JsonViewer:
 
         # Insert JSON file content
         for file_path in self.files:
-            with open(file_path, "r") as file:
+            resolved_file_path = resource_path(file_path)  # Ensure the path is resolved here
+            with open(resolved_file_path, 'r') as file:
                 content = file.read()
-                self.text.insert(tk.END, f"File: {file_path}\n{content}\n\n")
+                self.text.insert(tk.END, f"File: {resolved_file_path}\n{content}\n\n")
 
 
 if __name__ == "__main__":
     # Set the default output path and initialize logging
-    output_path = os.path.dirname(os.path.realpath(__file__)) + "/output/"
+    output_path = resource_path(os.path.dirname(os.path.realpath(__file__)) + "/output/")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     args = (
         get_arguments()
@@ -1065,8 +1071,10 @@ def get_username_password():
         root.geometry("%dx%d+%d+%d" % (width, height, x, y))
 
     def go_back():
+        # Adjust the path to ui.py if necessary using resource_path
+        ui_path = resource_path("ui.py")
         # Run ui.py and close the current window
-        subprocess.Popen(["python", "ui.py"])  # Adjust the path to ui.py if necessary
+        subprocess.Popen(['python', ui_path])
         sys.exit()  # Exit the script
 
     def submit():
@@ -1089,10 +1097,10 @@ def get_username_password():
 
     # if tk.TkVersion >= 8.6:
     #     icon_path = resource_path("icon.png")  # Use resource_path to get the correct path
-    #     root.iconphoto(True, tk.PhotoImage(file="icon.png"))  # For Linux
+    #     root.iconphoto(True, tk.PhotoImage(file=icon_path))  # For Linux and newer versions of Windows
     # else:
     #     icon_path = resource_path("icon.ico")  # Use resource_path to get the correct path
-    #     root.iconbitmap(default="icon.ico")  # For Windows
+    #     root.iconbitmap(default=icon_path)  # For older versions of Windows
 
     # Apply lighter Discord theme colors
     style = ttk.Style()
