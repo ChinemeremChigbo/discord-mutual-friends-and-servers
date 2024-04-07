@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import shlex
 import tkinter as tk
 from tkinter import ttk
@@ -17,6 +18,15 @@ class Colors:
     ENTRY_BG_COLOR = "#3e3e3e"  # Entry background color
     ENTRY_FG_COLOR = "#cccccc"  # Entry foreground color
     DISABLED_COLOR = "#888888"  # Disabled color
+
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 
 class ToolTip(object):
@@ -128,9 +138,11 @@ def get_arguments():
     root.resizable(True, True)
 
     if tk.TkVersion >= 8.6:
-        root.iconphoto(True, tk.PhotoImage(file="icon.png"))  # For Linux
+        icon_path = resource_path("icon.png")  # Use resource_path to get the correct path
+        root.iconphoto(True, tk.PhotoImage(file=icon_path))  # For Linux and newer versions of Windows
     else:
-        root.iconbitmap(default="icon.ico")  # For Windows
+        icon_path = resource_path("icon.ico")  # Use resource_path to get the correct path
+        root.iconbitmap(default=icon_path)  # For older versions of Windows
 
     args = {}
 
@@ -450,6 +462,7 @@ def on_client_complete():
     # Now, initiate the JSON viewer window
     json_viewer_root = tk.Tk()  # Start a new Tkinter instance for the JSON viewer
     json_files = [os.path.join(output_path, f) for f in os.listdir(output_path) if f.endswith('.json')]
+    # print(os.listdir(output_path) , "dfkjlsa;fjdiopwa")
     JsonViewer(json_viewer_root, json_files)
     json_viewer_root.mainloop()  # Start the Tkinter loop for the JSON viewer
 
@@ -507,13 +520,15 @@ class JsonViewer:
 
         # Insert JSON file content
         for file_path in self.files:
-            with open(file_path, 'r') as file:
+            resolved_file_path = resource_path(file_path)  # Ensure the path is resolved here
+            with open(resolved_file_path, 'r') as file:
                 content = file.read()
-                self.text.insert(tk.END, f"File: {file_path}\n{content}\n\n")
+                self.text.insert(tk.END, f"File: {resolved_file_path}\n{content}\n\n")
 
 if __name__ == "__main__":
     # Set the default output path and initialize logging
-    output_path = os.path.dirname(os.path.realpath(__file__)) + "/output/"
+    output_path = resource_path(os.path.dirname(os.path.realpath(__file__)) + "/output/")
+    # print(output_path)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     args = get_arguments()  # This needs to be adjusted to actually return args from the UI
     if args.get("get_token", False):

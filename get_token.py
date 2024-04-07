@@ -10,7 +10,16 @@ from tkinter import ttk
 
 import subprocess
 import sys
+import os
 
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 def get_username_password():
     def center_window(root, width=350, height=475):
@@ -25,8 +34,10 @@ def get_username_password():
         root.geometry("%dx%d+%d+%d" % (width, height, x, y))
 
     def go_back():
+        # Adjust the path to ui.py if necessary using resource_path
+        ui_path = resource_path("ui.py")
         # Run ui.py and close the current window
-        subprocess.Popen(['python', 'ui.py'])  # Adjust the path to ui.py if necessary
+        subprocess.Popen(['python', ui_path])
         sys.exit()  # Exit the script
 
     def submit():
@@ -48,9 +59,11 @@ def get_username_password():
     root.resizable(True, True)
 
     if tk.TkVersion >= 8.6:
-        root.iconphoto(True, tk.PhotoImage(file="icon.png"))  # For Linux
+        icon_path = resource_path("icon.png")  # Use resource_path to get the correct path
+        root.iconphoto(True, tk.PhotoImage(file=icon_path))  # For Linux and newer versions of Windows
     else:
-        root.iconbitmap(default="icon.ico")  # For Windows
+        icon_path = resource_path("icon.ico")  # Use resource_path to get the correct path
+        root.iconbitmap(default=icon_path)  # For older versions of Windows
 
     # Apply lighter Discord theme colors
     style = ttk.Style()
