@@ -16,6 +16,12 @@ This project is a proof of concept. Please be aware that the use of self bots is
 - Windows .exe and Mac .app
 - Connections graph
 
+## Building Windows .exe and Max .app from Source
+
+```bash
+pyinstaller --noconfirm main.spec
+```
+
 ## Limitations
 
 - If a server has more than 1000 members, this program is only able to retrieve
