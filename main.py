@@ -3,12 +3,21 @@ import json
 import logging
 import os
 from time import sleep
+import sys
 
 import discord
 from dotenv import load_dotenv
 
 from get_token import get_token
 
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 class MyClient(discord.Client):
     def __init__(
@@ -147,9 +156,8 @@ class MyClient(discord.Client):
         mutual_servers: dict,
         output_path: str,
     ) -> None:
-        os.makedirs(
-            output_path, exist_ok=True
-        )  # Create the directory if it doesn't exist
+        resolved_output_path = resource_path(output_path)
+        os.makedirs(resolved_output_path, exist_ok=True)  # Ensure the directory is created at the resolved path
 
         file_names = [
             (server_info, "server_info.json"),
@@ -159,9 +167,8 @@ class MyClient(discord.Client):
         ]
 
         for input_dictionary, file_name in file_names:
-            with open(
-                os.path.join(output_path, file_name), "w"
-            ) as fp:  # Use os.path.join for proper path handling
+            file_path = os.path.join(resolved_output_path, file_name)  # Resolve each file's path
+            with open(file_path, "w") as fp:
                 json.dump(input_dictionary, fp, indent=4)
 
     def print_client_info(

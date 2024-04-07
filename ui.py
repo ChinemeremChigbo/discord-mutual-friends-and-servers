@@ -405,6 +405,7 @@ class LoadingScreen:
         self.add_loading_message()
         self.root.withdraw()  # Initially hide the window
         self.configure_styles()  # Configure styles for the UI
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def configure_window(self):
         self.root.geometry("350x475")  # Window size
@@ -432,7 +433,13 @@ class LoadingScreen:
 
     def close(self):
         self.root.destroy()  # Close the windo    
-        
+    
+    def on_close(self):
+        """This method is called when the window is closed."""
+        # Here you can add any cleanup code if needed
+        self.close()
+        # Then exit the application
+        self.root.quit()  # Ensure the entire application stops running
 
     def update_message(self, message, fg_color=Colors.FG_COLOR):
             self.message_label.config(text=message, fg=fg_color)  # Update the label with the new message and foreground color
