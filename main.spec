@@ -34,10 +34,11 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=['/Users/chinemerem/Documents/GitHub/discord-mutual-friends-and-servers/icon.ico'],
 )
 app = BUNDLE(
     exe,
     name='main.app',
-    icon=None,
+    icon='/Users/chinemerem/Documents/GitHub/discord-mutual-friends-and-servers/icon.ico',
     bundle_identifier=None,
 )

@@ -197,14 +197,6 @@ def get_arguments():
     center_window(root)
     root.minsize(350, 475)
     root.resizable(True, True)
-
-    # if tk.TkVersion >= 8.6:
-    #     icon_path = resource_path("icon.png")  # Use resource_path to get the correct path
-    #     root.iconphoto(True, tk.PhotoImage(file=icon_path))  # For Linux and newer versions of Windows
-    # else:
-    #     icon_path = resource_path("icon.ico")  # Use resource_path to get the correct path
-    #     root.iconbitmap(default=icon_path)  # For older versions of Windows
-
     args = {}
 
     # Create a custom dark theme
@@ -1095,12 +1087,6 @@ def get_username_password():
 
     root.resizable(True, True)
 
-    # if tk.TkVersion >= 8.6:
-    #     icon_path = resource_path("icon.png")  # Use resource_path to get the correct path
-    #     root.iconphoto(True, tk.PhotoImage(file=icon_path))  # For Linux and newer versions of Windows
-    # else:
-    #     icon_path = resource_path("icon.ico")  # Use resource_path to get the correct path
-    #     root.iconbitmap(default=icon_path)  # For older versions of Windows
 
     # Apply lighter Discord theme colors
     style = ttk.Style()
