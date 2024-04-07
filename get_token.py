@@ -1,16 +1,20 @@
+import os
+import subprocess
+import sys
 import time
-
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-
 import tkinter as tk
 from tkinter import ttk
 
-import subprocess
-import sys
+import selenium
 
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 def get_username_password():
     def center_window(root, width=350, height=475):
@@ -47,10 +51,12 @@ def get_username_password():
 
     root.resizable(True, True)
 
-    if tk.TkVersion >= 8.6:
-        root.iconphoto(True, tk.PhotoImage(file="icon.png"))  # For Linux
-    else:
-        root.iconbitmap(default="icon.ico")  # For Windows
+    # if tk.TkVersion >= 8.6:
+    #     icon_path = resource_path("icon.png")  # Use resource_path to get the correct path
+    #     root.iconphoto(True, tk.PhotoImage(file="icon.png"))  # For Linux
+    # else:
+    #     icon_path = resource_path("icon.ico")  # Use resource_path to get the correct path
+    #     root.iconbitmap(default="icon.ico")  # For Windows
 
     # Apply lighter Discord theme colors
     style = ttk.Style()
@@ -147,22 +153,22 @@ def get_username_password():
 def get_token():
     username, password = get_username_password()
 
-    chrome_options = webdriver.ChromeOptions()
+    chrome_options = selenium.webdriver.ChromeOptions()
 
     # Initialize the Chrome driver with the options
-    driver = webdriver.Chrome(options=chrome_options)
+    driver = selenium.webdriver.Chrome(options=chrome_options)
 
     driver.get("https://discord.com/login")
     time.sleep(3)
 
-    username_input = driver.find_element(By.NAME, "email")
+    username_input = driver.find_element(selenium.webdriver.common.by.By.NAME, "email")
     username_input.send_keys(username)
 
-    password_input = driver.find_element(By.NAME, "password")
+    password_input = driver.find_element(selenium.webdriver.common.by.By.NAME, "password")
     password_input.send_keys(password)
 
     # click login button
-    driver.find_element(By.CSS_SELECTOR, "[type=submit]").click()
+    driver.find_element(selenium.webdriver.common.by.By.CSS_SELECTOR, "[type=submit]").click()
     time.sleep(15)
     token = ""
 
@@ -173,7 +179,7 @@ def get_token():
         )
 
         # Wait for the alert to be present
-        WebDriverWait(driver, 10).until(EC.alert_is_present())
+        selenium.webdriver.support.ui.WebDriverWait(driver, 10).until(selenium.webdriver.support.expected_conditions.alert_is_present())
 
         # Switch to the alert
         alert = driver.switch_to.alert

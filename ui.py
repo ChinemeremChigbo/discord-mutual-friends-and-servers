@@ -1,12 +1,63 @@
 import logging
 import os
 import shlex
+import subprocess
+import sys
+import threading
+import time
 import tkinter as tk
 from tkinter import ttk
 
-from get_token import get_token
-from main import MyClient
-import threading
+import selenium
+
+
+def get_token():
+    username, password = get_username_password()
+
+    chrome_options = selenium.webdriver.ChromeOptions()
+
+    # Initialize the Chrome driver with the options
+    driver = selenium.webdriver.Chrome(options=chrome_options)
+
+    driver.get("https://discord.com/login")
+    time.sleep(3)
+
+    username_input = driver.find_element(selenium.webdriver.common.by.By.NAME, "email")
+    username_input.send_keys(username)
+
+    password_input = driver.find_element(selenium.webdriver.common.by.By.NAME, "password")
+    password_input.send_keys(password)
+
+    # click login button
+    driver.find_element(selenium.webdriver.common.by.By.CSS_SELECTOR, "[type=submit]").click()
+    time.sleep(15)
+    token = ""
+
+    try:
+        # Trigger the JavaScript command that opens the alert
+        driver.execute_script(
+            "alert((webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m).find(m=>m?.exports?.default?.getToken!==void 0).exports.default.getToken())"
+        )
+
+        # Wait for the alert to be present
+        selenium.webdriver.support.ui.WebDriverWait(driver, 10).until(selenium.webdriver.support.expected_conditions.alert_is_present())
+
+        # Switch to the alert
+        alert = driver.switch_to.alert
+
+        # Get the text from the alert
+        token = alert.text
+        
+
+        # You can now accept the alert to close it
+        alert.accept()
+
+    except Exception as e:
+        print("An error occurred: ", e)
+
+    driver.close()
+    return token
+
 
 class Colors:
     # Define color codes
@@ -17,6 +68,16 @@ class Colors:
     ENTRY_BG_COLOR = "#3e3e3e"  # Entry background color
     ENTRY_FG_COLOR = "#cccccc"  # Entry foreground color
     DISABLED_COLOR = "#888888"  # Disabled color
+
+
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 
 class ToolTip(object):
@@ -127,10 +188,18 @@ def get_arguments():
     root.minsize(350, 475)
     root.resizable(True, True)
 
-    if tk.TkVersion >= 8.6:
-        root.iconphoto(True, tk.PhotoImage(file="icon.png"))  # For Linux
-    else:
-        root.iconbitmap(default="icon.ico")  # For Windows
+    # if tk.TkVersion >= 8.6:
+    #     icon_path = resource_path(
+    #         "icon.png"
+    #     )  # Use resource_path to get the correct path
+    #     root.iconphoto(
+    #         True, tk.PhotoImage(file=icon_path)
+    #     )  # For Linux and newer versions of Windows
+    # else:
+    #     icon_path = resource_path(
+    #         "icon.ico"
+    #     )  # Use resource_path to get the correct path
+    #     root.iconbitmap(default=icon_path)  # For older versions of Windows
 
     args = {}
 
@@ -385,6 +454,7 @@ def get_arguments():
     root.mainloop()
     return args
 
+
 class LoadingScreen:
     def __init__(self):
         self.root = tk.Tk()  # Changed back to Tk() to make it the primary window
@@ -398,32 +468,53 @@ class LoadingScreen:
         self.root.geometry("350x475")  # Window size
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        x = (screen_width / 2) - (350/2)
-        y = (screen_height / 2) - (475/2)
+        x = (screen_width / 2) - (350 / 2)
+        y = (screen_height / 2) - (475 / 2)
         self.root.geometry(f"+{int(x)}+{int(y)}")
         self.root.configure(bg=Colors.BG_COLOR)  # Set the window background color
 
     def add_loading_message(self):
         # Store the label in an attribute so it can be updated later
-        self.message_label = tk.Label(self.root, text="Loading, please wait...", bg=Colors.BG_COLOR, fg=Colors.FG_COLOR)
+        self.message_label = tk.Label(
+            self.root,
+            text="Loading, please wait...",
+            bg=Colors.BG_COLOR,
+            fg=Colors.FG_COLOR,
+        )
         self.message_label.pack(expand=True)
 
     def configure_styles(self):
         style = ttk.Style()
         style.configure("TFrame", background=Colors.BG_COLOR)
-        style.configure("TLabel", foreground=Colors.FG_COLOR, background=Colors.BG_COLOR, font=("Helvetica", 12))
-        style.configure("TCheckbutton", foreground=Colors.BG_COLOR, background=Colors.BG_COLOR, font=("Helvetica", 12))
-        style.configure("TButton", foreground=Colors.BLACK, background=Colors.ENTRY_BG_COLOR, font=("Helvetica", 12))
+        style.configure(
+            "TLabel",
+            foreground=Colors.FG_COLOR,
+            background=Colors.BG_COLOR,
+            font=("Helvetica", 12),
+        )
+        style.configure(
+            "TCheckbutton",
+            foreground=Colors.BG_COLOR,
+            background=Colors.BG_COLOR,
+            font=("Helvetica", 12),
+        )
+        style.configure(
+            "TButton",
+            foreground=Colors.BLACK,
+            background=Colors.ENTRY_BG_COLOR,
+            font=("Helvetica", 12),
+        )
 
     def show(self):
         self.root.deiconify()  # Show the window
 
     def close(self):
-        self.root.destroy()  # Close the windo    
-        
+        self.root.destroy()  # Close the windo
 
     def update_message(self, message, fg_color=Colors.FG_COLOR):
-            self.message_label.config(text=message, fg=fg_color)  # Update the label with the new message and foreground color
+        self.message_label.config(
+            text=message, fg=fg_color
+        )  # Update the label with the new message and foreground color
 
 
 def run_client(args, loading_screen):
@@ -444,14 +535,19 @@ def run_client(args, loading_screen):
     finally:
         # Ensure the loading screen is closed only if the client runs successfully
         loading_screen.close()  # Close the loading screen
-        
+
 
 def on_client_complete():
     # Now, initiate the JSON viewer window
     json_viewer_root = tk.Tk()  # Start a new Tkinter instance for the JSON viewer
-    json_files = [os.path.join(output_path, f) for f in os.listdir(output_path) if f.endswith('.json')]
+    json_files = [
+        os.path.join(output_path, f)
+        for f in os.listdir(output_path)
+        if f.endswith(".json")
+    ]
     JsonViewer(json_viewer_root, json_files)
     json_viewer_root.mainloop()  # Start the Tkinter loop for the JSON viewer
+
 
 class JsonViewer:
     def __init__(self, master, files):
@@ -461,23 +557,33 @@ class JsonViewer:
         self.configure_window()
         self.create_widgets()
         self.configure_styles()
-    
+
     def configure_window(self):
         # Similar geometry and background configuration as LoadingScreen
         self.master.geometry("350x475")  # Adjust the size as needed
         screen_width = self.master.winfo_screenwidth()
         screen_height = self.master.winfo_screenheight()
-        x = (screen_width / 2) - (350/2)  # Adjust the offset as needed
-        y = (screen_height / 2) - (475/2)  # Adjust the offset as needed
+        x = (screen_width / 2) - (350 / 2)  # Adjust the offset as needed
+        y = (screen_height / 2) - (475 / 2)  # Adjust the offset as needed
         self.master.geometry(f"+{int(x)}+{int(y)}")
         self.master.configure(bg=Colors.BG_COLOR)  # Use the same background color
-    
+
     def configure_styles(self):
         # Apply similar styles for consistency
         style = ttk.Style()
         style.configure("TFrame", background=Colors.BG_COLOR)
-        style.configure("TLabel", foreground=Colors.FG_COLOR, background=Colors.BG_COLOR, font=("Helvetica", 12))
-        style.configure("TButton", foreground=Colors.BLACK, background=Colors.ENTRY_BG_COLOR, font=("Helvetica", 12))
+        style.configure(
+            "TLabel",
+            foreground=Colors.FG_COLOR,
+            background=Colors.BG_COLOR,
+            font=("Helvetica", 12),
+        )
+        style.configure(
+            "TButton",
+            foreground=Colors.BLACK,
+            background=Colors.ENTRY_BG_COLOR,
+            font=("Helvetica", 12),
+        )
         # For Text widget, which doesn't use ttk.Style, configure directly
         self.text.config(bg=Colors.BG_COLOR, fg=Colors.FG_COLOR, font=("Helvetica", 12))
 
@@ -487,19 +593,30 @@ class JsonViewer:
         text_frame.pack(fill=tk.BOTH, expand=True)
 
         # Create the text widget with scrollbars inside the frame
-        self.text = tk.Text(text_frame, wrap=tk.NONE, width=80, height=20, 
-                            bg=Colors.BG_COLOR, fg=Colors.FG_COLOR, font=("Helvetica", 12),
-                            xscrollcommand=lambda *args: h_scrollbar.set(*args),
-                            yscrollcommand=lambda *args: v_scrollbar.set(*args))
-        self.text.grid(row=0, column=0, sticky='nsew')  # Use grid for better control
+        self.text = tk.Text(
+            text_frame,
+            wrap=tk.NONE,
+            width=80,
+            height=20,
+            bg=Colors.BG_COLOR,
+            fg=Colors.FG_COLOR,
+            font=("Helvetica", 12),
+            xscrollcommand=lambda *args: h_scrollbar.set(*args),
+            yscrollcommand=lambda *args: v_scrollbar.set(*args),
+        )
+        self.text.grid(row=0, column=0, sticky="nsew")  # Use grid for better control
 
         # Vertical scrollbar
-        v_scrollbar = tk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.text.yview)
-        v_scrollbar.grid(row=0, column=1, sticky='ns')
+        v_scrollbar = tk.Scrollbar(
+            text_frame, orient=tk.VERTICAL, command=self.text.yview
+        )
+        v_scrollbar.grid(row=0, column=1, sticky="ns")
 
         # Horizontal scrollbar
-        h_scrollbar = tk.Scrollbar(text_frame, orient=tk.HORIZONTAL, command=self.text.xview)
-        h_scrollbar.grid(row=1, column=0, sticky='ew')
+        h_scrollbar = tk.Scrollbar(
+            text_frame, orient=tk.HORIZONTAL, command=self.text.xview
+        )
+        h_scrollbar.grid(row=1, column=0, sticky="ew")
 
         # Configure grid row/column weights in the frame
         text_frame.grid_rowconfigure(0, weight=1)
@@ -507,15 +624,18 @@ class JsonViewer:
 
         # Insert JSON file content
         for file_path in self.files:
-            with open(file_path, 'r') as file:
+            with open(file_path, "r") as file:
                 content = file.read()
                 self.text.insert(tk.END, f"File: {file_path}\n{content}\n\n")
+
 
 if __name__ == "__main__":
     # Set the default output path and initialize logging
     output_path = os.path.dirname(os.path.realpath(__file__)) + "/output/"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    args = get_arguments()  # This needs to be adjusted to actually return args from the UI
+    args = (
+        get_arguments()
+    )  # This needs to be adjusted to actually return args from the UI
     if args.get("get_token", False):
         args["token"] = get_token()
     logging.basicConfig(level=args["loglevel"].upper())
@@ -533,3 +653,339 @@ if __name__ == "__main__":
     # Start the Tkinter loop for the loading screen
     loading_screen.root.mainloop()
     on_client_complete()
+
+
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+def get_username_password():
+    def center_window(root, width=350, height=475):
+        # Get screen width and height
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
+
+        # Calculate position x, y
+        x = (screen_width / 2) - (width / 2)
+        y = (screen_height / 2) - (height / 2)
+
+        root.geometry("%dx%d+%d+%d" % (width, height, x, y))
+
+    def go_back():
+        # Run ui.py and close the current window
+        subprocess.Popen(['python', 'ui.py'])  # Adjust the path to ui.py if necessary
+        sys.exit()  # Exit the script
+
+    def submit():
+        # Retrieve entered values
+        username_var.set(username_entry.get())
+        password_var.set(password_entry.get())
+        # Signal the main loop to continue and close the window
+        root.destroy()
+
+    # Initialize the main window
+    root = tk.Tk()
+    root.title("Get Token")
+
+    center_window(root)  # Set the size of the window
+
+    # Set minimum size
+    root.minsize(350, 475)
+
+    root.resizable(True, True)
+
+    # if tk.TkVersion >= 8.6:
+    #     icon_path = resource_path("icon.png")  # Use resource_path to get the correct path
+    #     root.iconphoto(True, tk.PhotoImage(file="icon.png"))  # For Linux
+    # else:
+    #     icon_path = resource_path("icon.ico")  # Use resource_path to get the correct path
+    #     root.iconbitmap(default="icon.ico")  # For Windows
+
+    # Apply lighter Discord theme colors
+    style = ttk.Style()
+    root.configure(bg="#2e2e2e")  # Discord-like background color
+    style.configure("TFrame", background="#2e2e2e")
+    style.configure(
+        "TLabel", foreground="#FFFFFF", background="#2e2e2e", font=("Helvetica", 12)
+    )
+    style.configure(
+        "TCheckbutton",
+        foreground="#FFFFFF",
+        background="#2e2e2e",
+        font=("Helvetica", 12),
+    )
+    style.configure(
+        "TButton", foreground="#000000", background="#4e4e4e", font=("Helvetica", 12)
+    )
+
+    # Main frame for content
+    main_frame = ttk.Frame(root)
+    main_frame.pack(expand=True, fill="both")
+
+    # Spacers for vertical centering
+    spacer_top = ttk.Frame(main_frame)
+    spacer_top.pack(side="top", fill="both", expand=True)
+    content_frame = ttk.Frame(main_frame)
+    content_frame.pack(pady=20)  # This frame holds the actual content
+    spacer_bottom = ttk.Frame(main_frame)
+    spacer_bottom.pack(side="bottom", fill="both", expand=True)
+
+    # Variables to hold credentials
+    username_var = tk.StringVar()
+    password_var = tk.StringVar()
+
+    ttk.Label(
+        content_frame, text="Email:", background="#2e2e2e", foreground="#FFFFFF"
+    ).pack()
+    username_entry = ttk.Entry(
+        content_frame,
+        background="#3e3e3e",
+        foreground="#cccccc",
+        # insertbackground="#cccccc",
+        width=40,
+    )
+    username_entry.pack(pady=(5, 10), padx=5)
+
+    ttk.Label(
+        content_frame, text="Password:", background="#2e2e2e", foreground="#FFFFFF"
+    ).pack()
+    password_entry = ttk.Entry(
+        content_frame,
+        show="*",
+        background="#3e3e3e",
+        foreground="#cccccc",
+        # insertbackground="#cccccc",
+        width=40,
+    )
+    password_entry.pack(pady=(5, 10), padx=5)
+
+    style = ttk.Style()
+    style.configure("Custom.TButton", foreground="#FFFFFF", background="#2e2e2e")
+
+    submit_btn = ttk.Button(
+        content_frame,
+        text="Submit",
+        command=submit,
+        style="Custom.TButton",
+    )
+
+    submit_btn.pack()
+
+    # Add a "Back" button
+    back_btn = ttk.Button(
+        content_frame,
+        text="Back",
+        command=go_back,  # Bind the go_back function to the button
+        style="Custom.TButton",
+    )
+    back_btn.pack(pady=(0, 20))
+
+    root.mainloop()
+
+    # After the window is closed, check if the variables were set
+    if username_var.get() and password_var.get():
+        return username_var.get(), password_var.get()
+    else:
+        # If the function reaches this point without valid inputs,
+        # it means the user closed the window without entering credentials.
+        # You can handle this case as needed, for example:
+        print("No credentials entered. Exiting...")
+        exit()  # Exit the script
+
+
+def get_token():
+    username, password = get_username_password()
+
+    chrome_options = selenium.webdriver.ChromeOptions()
+
+    # Initialize the Chrome driver with the options
+    driver = selenium.webdriver.Chrome(options=chrome_options)
+
+    driver.get("https://discord.com/login")
+    time.sleep(3)
+
+    username_input = driver.find_element(selenium.webdriver.common.by.By.NAME, "email")
+    username_input.send_keys(username)
+
+    password_input = driver.find_element(selenium.webdriver.common.by.By.NAME, "password")
+    password_input.send_keys(password)
+
+    # click login button
+    driver.find_element(selenium.webdriver.common.by.By.CSS_SELECTOR, "[type=submit]").click()
+    time.sleep(15)
+    token = ""
+
+    try:
+        # Trigger the JavaScript command that opens the alert
+        driver.execute_script(
+            "alert((webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m).find(m=>m?.exports?.default?.getToken!==void 0).exports.default.getToken())"
+        )
+
+        # Wait for the alert to be present
+        selenium.webdriver.support.ui.WebDriverWait(driver, 10).until(selenium.webdriver.support.expected_conditions.alert_is_present())
+
+        # Switch to the alert
+        alert = driver.switch_to.alert
+
+        # Get the text from the alert
+        token = alert.text
+        
+
+        # You can now accept the alert to close it
+        alert.accept()
+
+    except Exception as e:
+        print("An error occurred: ", e)
+
+    driver.close()
+    return token
+
+
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+def get_username_password():
+    def center_window(root, width=350, height=475):
+        # Get screen width and height
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
+
+        # Calculate position x, y
+        x = (screen_width / 2) - (width / 2)
+        y = (screen_height / 2) - (height / 2)
+
+        root.geometry("%dx%d+%d+%d" % (width, height, x, y))
+
+    def go_back():
+        # Run ui.py and close the current window
+        subprocess.Popen(['python', 'ui.py'])  # Adjust the path to ui.py if necessary
+        sys.exit()  # Exit the script
+
+    def submit():
+        # Retrieve entered values
+        username_var.set(username_entry.get())
+        password_var.set(password_entry.get())
+        # Signal the main loop to continue and close the window
+        root.destroy()
+
+    # Initialize the main window
+    root = tk.Tk()
+    root.title("Get Token")
+
+    center_window(root)  # Set the size of the window
+
+    # Set minimum size
+    root.minsize(350, 475)
+
+    root.resizable(True, True)
+
+    # if tk.TkVersion >= 8.6:
+    #     icon_path = resource_path("icon.png")  # Use resource_path to get the correct path
+    #     root.iconphoto(True, tk.PhotoImage(file="icon.png"))  # For Linux
+    # else:
+    #     icon_path = resource_path("icon.ico")  # Use resource_path to get the correct path
+    #     root.iconbitmap(default="icon.ico")  # For Windows
+
+    # Apply lighter Discord theme colors
+    style = ttk.Style()
+    root.configure(bg="#2e2e2e")  # Discord-like background color
+    style.configure("TFrame", background="#2e2e2e")
+    style.configure(
+        "TLabel", foreground="#FFFFFF", background="#2e2e2e", font=("Helvetica", 12)
+    )
+    style.configure(
+        "TCheckbutton",
+        foreground="#FFFFFF",
+        background="#2e2e2e",
+        font=("Helvetica", 12),
+    )
+    style.configure(
+        "TButton", foreground="#000000", background="#4e4e4e", font=("Helvetica", 12)
+    )
+
+    # Main frame for content
+    main_frame = ttk.Frame(root)
+    main_frame.pack(expand=True, fill="both")
+
+    # Spacers for vertical centering
+    spacer_top = ttk.Frame(main_frame)
+    spacer_top.pack(side="top", fill="both", expand=True)
+    content_frame = ttk.Frame(main_frame)
+    content_frame.pack(pady=20)  # This frame holds the actual content
+    spacer_bottom = ttk.Frame(main_frame)
+    spacer_bottom.pack(side="bottom", fill="both", expand=True)
+
+    # Variables to hold credentials
+    username_var = tk.StringVar()
+    password_var = tk.StringVar()
+
+    ttk.Label(
+        content_frame, text="Email:", background="#2e2e2e", foreground="#FFFFFF"
+    ).pack()
+    username_entry = ttk.Entry(
+        content_frame,
+        background="#3e3e3e",
+        foreground="#cccccc",
+        # insertbackground="#cccccc",
+        width=40,
+    )
+    username_entry.pack(pady=(5, 10), padx=5)
+
+    ttk.Label(
+        content_frame, text="Password:", background="#2e2e2e", foreground="#FFFFFF"
+    ).pack()
+    password_entry = ttk.Entry(
+        content_frame,
+        show="*",
+        background="#3e3e3e",
+        foreground="#cccccc",
+        # insertbackground="#cccccc",
+        width=40,
+    )
+    password_entry.pack(pady=(5, 10), padx=5)
+
+    style = ttk.Style()
+    style.configure("Custom.TButton", foreground="#FFFFFF", background="#2e2e2e")
+
+    submit_btn = ttk.Button(
+        content_frame,
+        text="Submit",
+        command=submit,
+        style="Custom.TButton",
+    )
+
+    submit_btn.pack()
+
+    # Add a "Back" button
+    back_btn = ttk.Button(
+        content_frame,
+        text="Back",
+        command=go_back,  # Bind the go_back function to the button
+        style="Custom.TButton",
+    )
+    back_btn.pack(pady=(0, 20))
+
+    root.mainloop()
+
+    # After the window is closed, check if the variables were set
+    if username_var.get() and password_var.get():
+        return username_var.get(), password_var.get()
+    else:
+        # If the function reaches this point without valid inputs,
+        # it means the user closed the window without entering credentials.
+        # You can handle this case as needed, for example:
+        print("No credentials entered. Exiting...")
+        exit()  # Exit the script
+
+
