@@ -1051,6 +1051,7 @@ if __name__ == "__main__":
 #     )
 #     client.run(token)
 
+
 def get_username_password():
     def center_window(root, width=350, height=475):
         # Get screen width and height
@@ -1236,5 +1237,3 @@ def get_token():
 
     driver.close()
     return token
-
-
