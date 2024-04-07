@@ -1,3 +1,5 @@
+import argparse
+import json
 import logging
 import os
 import shlex
@@ -6,9 +8,12 @@ import sys
 import threading
 import time
 import tkinter as tk
+from time import sleep
 from tkinter import ttk
 
+import discord
 import selenium
+from dotenv import load_dotenv
 
 
 def get_token():
@@ -25,11 +30,15 @@ def get_token():
     username_input = driver.find_element(selenium.webdriver.common.by.By.NAME, "email")
     username_input.send_keys(username)
 
-    password_input = driver.find_element(selenium.webdriver.common.by.By.NAME, "password")
+    password_input = driver.find_element(
+        selenium.webdriver.common.by.By.NAME, "password"
+    )
     password_input.send_keys(password)
 
     # click login button
-    driver.find_element(selenium.webdriver.common.by.By.CSS_SELECTOR, "[type=submit]").click()
+    driver.find_element(
+        selenium.webdriver.common.by.By.CSS_SELECTOR, "[type=submit]"
+    ).click()
     time.sleep(15)
     token = ""
 
@@ -40,14 +49,15 @@ def get_token():
         )
 
         # Wait for the alert to be present
-        selenium.webdriver.support.ui.WebDriverWait(driver, 10).until(selenium.webdriver.support.expected_conditions.alert_is_present())
+        selenium.webdriver.support.ui.WebDriverWait(driver, 10).until(
+            selenium.webdriver.support.expected_conditions.alert_is_present()
+        )
 
         # Switch to the alert
         alert = driver.switch_to.alert
 
         # Get the text from the alert
         token = alert.text
-        
 
         # You can now accept the alert to close it
         alert.accept()
@@ -517,6 +527,363 @@ class LoadingScreen:
         )  # Update the label with the new message and foreground color
 
 
+class MyClient(discord.Client):
+    def __init__(
+        self,
+        sleep_time,
+        output_verbosity,
+        print_info,
+        write_to_json,
+        output_path,
+        include_servers,
+    ):
+        super().__init__()
+        self.sleep_time = sleep_time
+        self.output_verbosity = output_verbosity
+        self.print_info = print_info
+        self.write_to_json = write_to_json
+        self.output_path = output_path
+        self.include_servers = set(include_servers)
+
+    async def on_ready(self) -> None:
+        friend_ids = self.get_friend_ids(self)
+        server_info = await self.get_server_info(
+            self,
+            friend_ids,
+            self.sleep_time,
+            self.include_servers,
+        )
+        friends = self.get_friends(server_info)
+        mutual_friends = self.get_mutual_friends(server_info, self.output_verbosity)
+        mutual_servers = self.get_mutual_servers(server_info, self.output_verbosity)
+
+        if self.print_info:
+            self.print_client_info(server_info, friends, mutual_friends, mutual_servers)
+
+        if self.write_to_json:
+            self.write_data_to_json(
+                server_info, friends, mutual_friends, mutual_servers, self.output_path
+            )
+
+        await self.close()
+
+    def get_friend_ids(self, client: discord.Client) -> set:
+        friend_ids = set()
+        for friend in self.friends:
+            friend_ids.add(friend.user.id)
+        return friend_ids
+
+    def get_friends(self, server_info: dict) -> dict:
+        friends = dict()
+        for server in server_info:
+            friends[server] = list()
+            for member in server_info[server]:
+                if server_info[server][member]["is_friend"]:
+                    friends[server].append(member)
+        return friends
+
+    def get_mutual_friends(self, server_info: dict, output_verbosity: int) -> dict:
+        mutual_friends = dict()
+        for server in server_info:
+            mutual_friends[server] = list()
+            for member in server_info[server]:
+                if server_info[server][member]["mutual_friends"]:
+                    mutual_friends[server].append(
+                        (
+                            -len(server_info[server][member]["mutual_friends"]),
+                            member,
+                            server_info[server][member]["mutual_friends"],
+                        )
+                    )
+            mutual_friends[server].sort()
+            if output_verbosity == 1:
+                mutual_friends[server] = [
+                    member
+                    for mutual_friends_count, member, mutual_friends_list in mutual_friends[
+                        server
+                    ]
+                ]
+            elif output_verbosity == 2:
+                mutual_friends[server] = {
+                    member: -mutual_friends_count
+                    for mutual_friends_count, member, mutual_friends_list in mutual_friends[
+                        server
+                    ]
+                }
+            else:
+                mutual_friends[server] = {
+                    member: mutual_friends_list
+                    for mutual_friends_count, member, mutual_friends_list in mutual_friends[
+                        server
+                    ]
+                }
+        return mutual_friends
+
+    def get_mutual_servers(self, server_info: dict, output_verbosity: int) -> dict:
+        mutual_servers = dict()
+        for server in server_info:
+            mutual_servers[server] = list()
+            for member in server_info[server]:
+                if server_info[server][member]["mutual_servers"]:
+                    mutual_servers[server].append(
+                        (
+                            -len(server_info[server][member]["mutual_servers"]),
+                            member,
+                            server_info[server][member]["mutual_servers"],
+                        )
+                    )
+            mutual_servers[server].sort()
+            if output_verbosity == 1:
+                mutual_servers[server] = [
+                    member
+                    for mutual_servers_count, member, mutual_servers_list in mutual_servers[
+                        server
+                    ]
+                ]
+            elif output_verbosity == 2:
+                mutual_servers[server] = {
+                    member: -mutual_servers_count
+                    for mutual_servers_count, member, mutual_servers_list in mutual_servers[
+                        server
+                    ]
+                }
+            else:
+                mutual_servers[server] = {
+                    member: mutual_servers_list
+                    for mutual_servers_count, member, mutual_servers_list in mutual_servers[
+                        server
+                    ]
+                }
+        return mutual_servers
+
+    def write_data_to_json(
+        self,
+        server_info: dict,
+        friends: dict,
+        mutual_friends: dict,
+        mutual_servers: dict,
+        output_path: str,
+    ) -> None:
+        os.makedirs(
+            output_path, exist_ok=True
+        )  # Create the directory if it doesn't exist
+
+        file_names = [
+            (server_info, "server_info.json"),
+            (friends, "friends.json"),
+            (mutual_friends, "mutual_friends.json"),
+            (mutual_servers, "mutual_servers.json"),
+        ]
+
+        for input_dictionary, file_name in file_names:
+            with open(
+                os.path.join(output_path, file_name), "w"
+            ) as fp:  # Use os.path.join for proper path handling
+                json.dump(input_dictionary, fp, indent=4)
+
+    def print_client_info(
+        self,
+        server_info: dict,
+        friends: dict,
+        mutual_friends: dict,
+        mutual_servers: dict,
+    ) -> None:
+        print("\nServer Info\n")
+        print(json.dumps(server_info, indent=4))
+        print("\nFriends\n")
+        print(json.dumps(friends, indent=4))
+        print("\nMutual Friends\n")
+        print(json.dumps(mutual_friends, indent=4))
+        print("\nMutual Servers\n")
+        print(json.dumps(mutual_servers, indent=4))
+
+    async def get_server_info(
+        self,
+        client: discord.Client,
+        friend_ids: set,
+        sleep_time: float,
+        include_servers: set,
+    ) -> dict:
+        user_servers = await client.fetch_guilds()
+        servers_count = len(user_servers)
+        server_info = dict()
+        seen_members = dict()
+        include_servers = set(include_servers)
+        specific_server_count = 0
+        matched_servers = set()
+        seen_servers = set()
+
+        for server_idx, user_server in enumerate(user_servers):
+            server = client.get_guild(user_server.id)
+            server_name = server.name
+            seen_servers.add(server_name)
+            if include_servers:
+                if server_name not in include_servers:
+                    continue
+                else:
+                    matched_servers.add(server_name)
+                    specific_server_count += 1
+
+            fetch_server_members = set(await server.fetch_members())
+            guild_server_members = set(server.members)
+            server_members = list(fetch_server_members.union(guild_server_members))
+
+            server_members_count = len(server_members)
+
+            server_info[server_name] = dict()
+
+            for member_idx, member in enumerate(server_members):
+                if include_servers:
+                    logging.info(
+                        f"Processing {server.name} server, progress = {specific_server_count}/{len(include_servers)} servers {member_idx+1}/{server_members_count} members"
+                    )
+                else:
+                    logging.info(
+                        f"Processing {server.name} server, progress = {server_idx+1}/{servers_count} servers {member_idx+1}/{server_members_count} members"
+                    )
+                if member.id == client.user.id:
+                    continue
+
+                member_name = f"{member.name}#{member.discriminator}"
+
+                if member_name in seen_members:
+                    server_info[server_name][member_name] = dict()
+                    server_info[server_name][member_name]["is_friend"] = seen_members[
+                        member_name
+                    ]["is_friend"]
+                    server_info[server_name][member_name]["mutual_friends"] = (
+                        seen_members[member_name]["mutual_friends"]
+                    )
+
+                    server_info[server_name][member_name]["mutual_servers"] = (
+                        seen_members[member_name]["mutual_servers"]
+                    )
+                    continue
+                else:
+                    seen_members[member_name] = dict()
+
+                member_profile = await server.fetch_member_profile(
+                    member.id,
+                    with_mutual_guilds=True,
+                    with_mutual_friends=True,
+                )
+
+                server_info[server_name][member_name] = dict()
+
+                mutual_friend_names = []
+                mutual_server_names = []
+                mutual_friends = member_profile.mutual_friends
+                mutual_servers = member_profile.mutual_guilds
+
+                if member.id in friend_ids:
+                    server_info[server_name][member_name]["is_friend"] = True
+                    seen_members[member_name]["is_friend"] = True
+                else:
+                    server_info[server_name][member_name]["is_friend"] = False
+                    seen_members[member_name]["is_friend"] = False
+
+                for friend in mutual_friends:
+                    friend_name = f"{friend.name}#{friend.discriminator}"
+                    mutual_friend_names.append(friend_name)
+
+                server_info[server_name][member_name]["mutual_friends"] = (
+                    mutual_friend_names
+                )
+                seen_members[member_name]["mutual_friends"] = mutual_friend_names
+
+                for mutual_server in mutual_servers:
+                    if mutual_server.id != server.id:
+                        mutual_server_names.append(mutual_server.guild.name)
+
+                server_info[server_name][member_name]["mutual_servers"] = (
+                    mutual_server_names
+                )
+
+                seen_members[member_name]["mutual_servers"] = mutual_server_names
+
+                sleep(sleep_time)
+
+        unmatched_servers = include_servers.difference(matched_servers)
+        if unmatched_servers:
+            logging.warning(
+                f"Did not find the following servers: {unmatched_servers} consider choosing from the following servers: {seen_servers}"
+            )
+        return server_info
+
+
+def check_positive_float(original_value):
+    try:
+        value = float(original_value)
+        if value <= 0:
+            raise argparse.ArgumentTypeError(f"{original_value} is not a positive")
+    except ValueError:
+        raise Exception(f"{original_value} is not an float")
+    return value
+
+
+def add_arguments(parser: argparse.ArgumentParser, output_path=str):
+    parser.add_argument(
+        "-s",
+        "--sleep_time",
+        default=2.0,
+        type=check_positive_float,
+        help="How long to sleep between each member request. With values lower than 2, rate limits tend to be hit, which may lead to a ban. Increase if you hit a rate limit. Example --sleep_time 3, default=2",
+    )
+
+    parser.add_argument(
+        "-l",
+        "--loglevel",
+        default="info",
+        choices=["debug", "info", "warn", "warning", "error", "critical"],
+        help="Provide logging level. Example --loglevel debug, default=info",
+    )
+
+    parser.add_argument(
+        "-v",
+        "--output_verbosity",
+        default=2,
+        type=int,
+        choices=[1, 2, 3],
+        help="How much information to be included in the mutual friends and mutual servers files. 1 means just the member name. 2 means the member name and a count the member's of mutual friends or mutual servers. 3 means the member name and a list of the member's mutual friends or mutual servers. Example --output_verbosity 3, default=2",
+    )
+
+    parser.add_argument(
+        "-p",
+        "--print_info",
+        default=True,
+        help="If true, the server info, mutual friends, and mutual servers are printed to the command line. Example --print_info False, default=True",
+    )
+
+    parser.add_argument(
+        "-j",
+        "--write_to_json",
+        default=True,
+        help="If true, the server info, mutual friends, and mutual servers are written to json files. Example --write_to_json False, default=True",
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output_path",
+        default=output_path,
+        help="Location for output files. Example --output_path some_directory/some_subdirectory/, default=pwd+'output'",
+    )
+
+    parser.add_argument(
+        "-i",
+        "--include_servers",
+        default="",
+        nargs="+",
+        help="Only process servers whose names are in this list. If not specified, process all servers. Put server names with mutltiple words in quotes. Example --include_servers 'server 1' 'server2' 'server3', default=''",
+    )
+
+    parser.add_argument(
+        "-g",
+        "--get_token",
+        action="store_true",
+        help="If set, will run the get_token script to get a token",
+    )
+
+
 def run_client(args, loading_screen):
     try:
         client = MyClient(
@@ -654,15 +1021,35 @@ if __name__ == "__main__":
     loading_screen.root.mainloop()
     on_client_complete()
 
+# if __name__ == "__main__":
+#     # Set the default output path to the current working directory + /output/
+#     output_path = os.path.dirname(os.path.realpath(__file__)) + "/output/"
+#     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-def resource_path(relative_path):
-    """Get absolute path to resource, works for dev and for PyInstaller"""
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
+#     parser = argparse.ArgumentParser()
+#     add_arguments(parser, output_path)
+#     args = parser.parse_args()
+#     if args.get_token:
+#         get_token()
+#     logging.basicConfig(level=args.loglevel.upper())
+
+#     key = "TOKEN"
+#     if key in os.environ:
+#         del os.environ[key]
+
+#     load_dotenv(verbose=True)
+#     token = os.getenv(key)
+
+#     client = MyClient(
+#         sleep_time=args.sleep_time,
+#         output_verbosity=args.output_verbosity,
+#         print_info=args.print_info,
+#         write_to_json=args.write_to_json,
+#         output_path=args.output_path,
+
+#         include_servers=args.include_servers,
+#     )
+#     client.run(token)
 
 def get_username_password():
     def center_window(root, width=350, height=475):
@@ -678,7 +1065,7 @@ def get_username_password():
 
     def go_back():
         # Run ui.py and close the current window
-        subprocess.Popen(['python', 'ui.py'])  # Adjust the path to ui.py if necessary
+        subprocess.Popen(["python", "ui.py"])  # Adjust the path to ui.py if necessary
         sys.exit()  # Exit the script
 
     def submit():
@@ -812,11 +1199,15 @@ def get_token():
     username_input = driver.find_element(selenium.webdriver.common.by.By.NAME, "email")
     username_input.send_keys(username)
 
-    password_input = driver.find_element(selenium.webdriver.common.by.By.NAME, "password")
+    password_input = driver.find_element(
+        selenium.webdriver.common.by.By.NAME, "password"
+    )
     password_input.send_keys(password)
 
     # click login button
-    driver.find_element(selenium.webdriver.common.by.By.CSS_SELECTOR, "[type=submit]").click()
+    driver.find_element(
+        selenium.webdriver.common.by.By.CSS_SELECTOR, "[type=submit]"
+    ).click()
     time.sleep(15)
     token = ""
 
@@ -827,14 +1218,15 @@ def get_token():
         )
 
         # Wait for the alert to be present
-        selenium.webdriver.support.ui.WebDriverWait(driver, 10).until(selenium.webdriver.support.expected_conditions.alert_is_present())
+        selenium.webdriver.support.ui.WebDriverWait(driver, 10).until(
+            selenium.webdriver.support.expected_conditions.alert_is_present()
+        )
 
         # Switch to the alert
         alert = driver.switch_to.alert
 
         # Get the text from the alert
         token = alert.text
-        
 
         # You can now accept the alert to close it
         alert.accept()
@@ -844,148 +1236,5 @@ def get_token():
 
     driver.close()
     return token
-
-
-def resource_path(relative_path):
-    """Get absolute path to resource, works for dev and for PyInstaller"""
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
-
-def get_username_password():
-    def center_window(root, width=350, height=475):
-        # Get screen width and height
-        screen_width = root.winfo_screenwidth()
-        screen_height = root.winfo_screenheight()
-
-        # Calculate position x, y
-        x = (screen_width / 2) - (width / 2)
-        y = (screen_height / 2) - (height / 2)
-
-        root.geometry("%dx%d+%d+%d" % (width, height, x, y))
-
-    def go_back():
-        # Run ui.py and close the current window
-        subprocess.Popen(['python', 'ui.py'])  # Adjust the path to ui.py if necessary
-        sys.exit()  # Exit the script
-
-    def submit():
-        # Retrieve entered values
-        username_var.set(username_entry.get())
-        password_var.set(password_entry.get())
-        # Signal the main loop to continue and close the window
-        root.destroy()
-
-    # Initialize the main window
-    root = tk.Tk()
-    root.title("Get Token")
-
-    center_window(root)  # Set the size of the window
-
-    # Set minimum size
-    root.minsize(350, 475)
-
-    root.resizable(True, True)
-
-    # if tk.TkVersion >= 8.6:
-    #     icon_path = resource_path("icon.png")  # Use resource_path to get the correct path
-    #     root.iconphoto(True, tk.PhotoImage(file="icon.png"))  # For Linux
-    # else:
-    #     icon_path = resource_path("icon.ico")  # Use resource_path to get the correct path
-    #     root.iconbitmap(default="icon.ico")  # For Windows
-
-    # Apply lighter Discord theme colors
-    style = ttk.Style()
-    root.configure(bg="#2e2e2e")  # Discord-like background color
-    style.configure("TFrame", background="#2e2e2e")
-    style.configure(
-        "TLabel", foreground="#FFFFFF", background="#2e2e2e", font=("Helvetica", 12)
-    )
-    style.configure(
-        "TCheckbutton",
-        foreground="#FFFFFF",
-        background="#2e2e2e",
-        font=("Helvetica", 12),
-    )
-    style.configure(
-        "TButton", foreground="#000000", background="#4e4e4e", font=("Helvetica", 12)
-    )
-
-    # Main frame for content
-    main_frame = ttk.Frame(root)
-    main_frame.pack(expand=True, fill="both")
-
-    # Spacers for vertical centering
-    spacer_top = ttk.Frame(main_frame)
-    spacer_top.pack(side="top", fill="both", expand=True)
-    content_frame = ttk.Frame(main_frame)
-    content_frame.pack(pady=20)  # This frame holds the actual content
-    spacer_bottom = ttk.Frame(main_frame)
-    spacer_bottom.pack(side="bottom", fill="both", expand=True)
-
-    # Variables to hold credentials
-    username_var = tk.StringVar()
-    password_var = tk.StringVar()
-
-    ttk.Label(
-        content_frame, text="Email:", background="#2e2e2e", foreground="#FFFFFF"
-    ).pack()
-    username_entry = ttk.Entry(
-        content_frame,
-        background="#3e3e3e",
-        foreground="#cccccc",
-        # insertbackground="#cccccc",
-        width=40,
-    )
-    username_entry.pack(pady=(5, 10), padx=5)
-
-    ttk.Label(
-        content_frame, text="Password:", background="#2e2e2e", foreground="#FFFFFF"
-    ).pack()
-    password_entry = ttk.Entry(
-        content_frame,
-        show="*",
-        background="#3e3e3e",
-        foreground="#cccccc",
-        # insertbackground="#cccccc",
-        width=40,
-    )
-    password_entry.pack(pady=(5, 10), padx=5)
-
-    style = ttk.Style()
-    style.configure("Custom.TButton", foreground="#FFFFFF", background="#2e2e2e")
-
-    submit_btn = ttk.Button(
-        content_frame,
-        text="Submit",
-        command=submit,
-        style="Custom.TButton",
-    )
-
-    submit_btn.pack()
-
-    # Add a "Back" button
-    back_btn = ttk.Button(
-        content_frame,
-        text="Back",
-        command=go_back,  # Bind the go_back function to the button
-        style="Custom.TButton",
-    )
-    back_btn.pack(pady=(0, 20))
-
-    root.mainloop()
-
-    # After the window is closed, check if the variables were set
-    if username_var.get() and password_var.get():
-        return username_var.get(), password_var.get()
-    else:
-        # If the function reaches this point without valid inputs,
-        # it means the user closed the window without entering credentials.
-        # You can handle this case as needed, for example:
-        print("No credentials entered. Exiting...")
-        exit()  # Exit the script
 
 
