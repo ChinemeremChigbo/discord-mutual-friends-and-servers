@@ -328,9 +328,9 @@ def add_arguments(parser: argparse.ArgumentParser, output_path=str):
     parser.add_argument(
         "-s",
         "--sleep_time",
-        default=2.0,
+        default=3.0,
         type=check_positive_float,
-        help="How long to sleep between each member request. With values lower than 2, rate limits tend to be hit, which may lead to a ban. Increase if you hit a rate limit. Example --sleep_time 3, default=2",
+        help="How long to sleep between each member request. With values lower than 3, rate limits tend to be hit, which may lead to a ban. Increase if you hit a rate limit. Example --sleep_time 4, default=3",
     )
 
     parser.add_argument(
