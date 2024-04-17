@@ -220,7 +220,11 @@ class MyClient(discord.Client):
                     matched_servers.add(server_name)
                     specific_server_count += 1
 
-            fetch_server_members = set(await server.fetch_members())
+            try:
+                fetch_server_members = set(await server.fetch_members())
+            except Exception:
+                fetch_server_members = set()
+
             guild_server_members = set(server.members)
             server_members = list(fetch_server_members.union(guild_server_members))
 
