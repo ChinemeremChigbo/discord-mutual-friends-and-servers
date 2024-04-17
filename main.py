@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 
 from get_token import get_token
 
+
 def resource_path(relative_path):
     """Get absolute path to resource, works for dev and for PyInstaller"""
     try:
@@ -18,6 +19,7 @@ def resource_path(relative_path):
     except Exception:
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
+
 
 class MyClient(discord.Client):
     def __init__(
@@ -157,7 +159,9 @@ class MyClient(discord.Client):
         output_path: str,
     ) -> None:
         resolved_output_path = resource_path(output_path)
-        os.makedirs(resolved_output_path, exist_ok=True)  # Ensure the directory is created at the resolved path
+        os.makedirs(
+            resolved_output_path, exist_ok=True
+        )  # Ensure the directory is created at the resolved path
 
         file_names = [
             (server_info, "server_info.json"),
@@ -167,7 +171,9 @@ class MyClient(discord.Client):
         ]
 
         for input_dictionary, file_name in file_names:
-            file_path = os.path.join(resolved_output_path, file_name)  # Resolve each file's path
+            file_path = os.path.join(
+                resolved_output_path, file_name
+            )  # Resolve each file's path
             with open(file_path, "w") as fp:
                 json.dump(input_dictionary, fp, indent=4)
 
@@ -244,13 +250,13 @@ class MyClient(discord.Client):
                     server_info[server_name][member_name]["is_friend"] = seen_members[
                         member_name
                     ]["is_friend"]
-                    server_info[server_name][member_name][
-                        "mutual_friends"
-                    ] = seen_members[member_name]["mutual_friends"]
+                    server_info[server_name][member_name]["mutual_friends"] = (
+                        seen_members[member_name]["mutual_friends"]
+                    )
 
-                    server_info[server_name][member_name][
-                        "mutual_servers"
-                    ] = seen_members[member_name]["mutual_servers"]
+                    server_info[server_name][member_name]["mutual_servers"] = (
+                        seen_members[member_name]["mutual_servers"]
+                    )
                     continue
                 else:
                     seen_members[member_name] = dict()
@@ -279,18 +285,18 @@ class MyClient(discord.Client):
                     friend_name = f"{friend.name}#{friend.discriminator}"
                     mutual_friend_names.append(friend_name)
 
-                server_info[server_name][member_name][
-                    "mutual_friends"
-                ] = mutual_friend_names
+                server_info[server_name][member_name]["mutual_friends"] = (
+                    mutual_friend_names
+                )
                 seen_members[member_name]["mutual_friends"] = mutual_friend_names
 
                 for mutual_server in mutual_servers:
                     if mutual_server.id != server.id:
                         mutual_server_names.append(mutual_server.guild.name)
 
-                server_info[server_name][member_name][
-                    "mutual_servers"
-                ] = mutual_server_names
+                server_info[server_name][member_name]["mutual_servers"] = (
+                    mutual_server_names
+                )
 
                 seen_members[member_name]["mutual_servers"] = mutual_server_names
 
