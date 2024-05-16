@@ -124,6 +124,11 @@ def get_arguments():
             if include_servers_entry.get()
             else []
         )
+        args["include_channels"] = (
+            shlex.split(include_channels_entry.get()) 
+            if include_channels_entry.get() 
+            else []
+        )
         args["get_token"] = get_token_var.get()
 
         if not args.get("get_token"):
@@ -304,6 +309,34 @@ def get_arguments():
         "Only process servers whose names are in this list. If not specified, process all servers. Put server names with mutltiple words in quotes.",
     )
 
+    channels_include_frame = ttk.Frame(content_frame)
+    channels_include_frame.pack(pady=5)
+    ttk.Label(
+        channels_include_frame,
+        text="Enter channels to include:",
+        background=Colors.BG_COLOR,
+        foreground=Colors.FG_COLOR,
+    ).pack(side="left", padx=5)
+    include_channels_entry = tk.Entry(
+        channels_include_frame,
+        bg=entry_bg_color,
+        fg=entry_fg_color,
+        insertbackground=entry_fg_color,
+    )
+    include_channels_entry.pack(side="left", expand=True, fill="x", padx=(5, 0))
+    question_mark_channels_include = ttk.Label(
+        channels_include_frame,
+        text="?",
+        foreground=Colors.FG_COLOR,
+        background=Colors.BG_COLOR,
+        cursor="hand2",
+    )
+    question_mark_channels_include.pack(side="left", padx=(5, 0))
+    ToolTip(
+        question_mark_channels_include,
+        "Only process the members who are in the provided channels. If not specified, tries to retrieve all server members if you have the appropriate permissions, otherwise attempts to scrape the member sidebar. Example --include_channels 'channel-1' 'channel-2' 'channel-3', default=''",
+    )
+
     output_verbosity_options = [1, 2, 3]
     verbosity_label_frame = ttk.Frame(content_frame)
     verbosity_label_frame.pack(pady=(5, 0))
@@ -403,6 +436,7 @@ class LoadingScreen:
         self.root.title("Loading")
         self.configure_window()
         self.add_loading_message()
+        self.add_progress_bar()
         self.root.withdraw()  # Initially hide the window
         self.configure_styles()  # Configure styles for the UI
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -420,6 +454,13 @@ class LoadingScreen:
         # Store the label in an attribute so it can be updated later
         self.message_label = tk.Label(self.root, text="Loading, please wait...", bg=Colors.BG_COLOR, fg=Colors.FG_COLOR)
         self.message_label.pack(expand=True)
+
+    def add_progress_bar(self):
+        # Add a progress bar just below the loading message
+        self.progress = ttk.Progressbar(self.root, orient="horizontal", length=300, mode='determinate')
+        self.progress.place(y= 250, x = 30)
+        # self.progress.pack(pady=(10, 20))  # Some padding to give space from the label
+        self.progress.start(100)
 
     def configure_styles(self):
         style = ttk.Style()
@@ -444,7 +485,6 @@ class LoadingScreen:
     def update_message(self, message, fg_color=Colors.FG_COLOR):
             self.message_label.config(text=message, fg=fg_color)  # Update the label with the new message and foreground color
 
-
 def run_client(args, loading_screen):
     try:
         client = MyClient(
@@ -454,6 +494,7 @@ def run_client(args, loading_screen):
             write_to_json=args["write_to_json"],
             output_path=args["output_path"],
             include_servers=args["include_servers"],
+            include_channels=args["include_channels"]
         )
         client.run(args["token"])
     except Exception as e:
