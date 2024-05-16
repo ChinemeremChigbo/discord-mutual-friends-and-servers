@@ -84,7 +84,7 @@ class ToolTip(object):
 
 
 def get_arguments():
-    def center_window(root, width=350, height=475):
+    def center_window(root, width=350, height=500):
         # Get screen width and height
         screen_width = root.winfo_screenwidth()
         screen_height = root.winfo_screenheight()
@@ -129,6 +129,7 @@ def get_arguments():
             if include_channels_entry.get() 
             else []
         )
+        args["max_members"] = int(max_members_entry.get()) if max_members_entry.get().isdigit() else None
         args["get_token"] = get_token_var.get()
 
         if not args.get("get_token"):
@@ -337,6 +338,35 @@ def get_arguments():
         "Only process the members who are in the provided channels. If not specified, tries to retrieve all server members if you have the appropriate permissions, otherwise attempts to scrape the member sidebar. Example --include_channels 'channel-1' 'channel-2' 'channel-3', default=''",
     )
 
+    max_members_frame = ttk.Frame(content_frame)
+    max_members_frame.pack(pady=5)
+    ttk.Label(
+        max_members_frame,
+        text="Max Members:",
+        background=Colors.BG_COLOR,
+        foreground=Colors.FG_COLOR,
+    ).pack(side="left", padx=5)
+    max_members_entry = tk.Entry(
+        max_members_frame,
+        bg=entry_bg_color,
+        fg=entry_fg_color,
+        insertbackground=entry_fg_color,
+    )
+    max_members_entry.pack(side="left", expand=True, fill="x", padx=(5, 0))
+    max_members_entry.config(validate="key", validatecommand=(root.register(lambda s: s.isdigit() or s == ""), "%P"))  # Allow digits and empty string (backspace)
+    question_mark_max_members = ttk.Label(
+        max_members_frame,
+        text="?",
+        foreground=Colors.FG_COLOR,
+        background=Colors.BG_COLOR,
+        cursor="hand2",
+    )
+    question_mark_max_members.pack(side="left", padx=(5, 0))
+    ToolTip(
+        question_mark_max_members,
+        "Maximum number of members to process.",
+    )
+
     output_verbosity_options = [1, 2, 3]
     verbosity_label_frame = ttk.Frame(content_frame)
     verbosity_label_frame.pack(pady=(5, 0))
@@ -494,7 +524,8 @@ def run_client(args, loading_screen):
             write_to_json=args["write_to_json"],
             output_path=args["output_path"],
             include_servers=args["include_servers"],
-            include_channels=args["include_channels"]
+            include_channels=args["include_channels"],
+            max_members=args["max_members"]
         )
         client.run(args["token"])
     except Exception as e:
