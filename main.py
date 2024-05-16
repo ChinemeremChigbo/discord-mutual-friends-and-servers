@@ -31,6 +31,7 @@ class MyClient(discord.Client):
         output_path,
         include_servers,
         include_channels,
+        max_members,
     ):
         super().__init__()
         self.sleep_time = sleep_time
@@ -40,6 +41,7 @@ class MyClient(discord.Client):
         self.output_path = output_path
         self.include_servers = set(include_servers)
         self.include_channels = set(include_channels)
+        self.max_members = max_members
 
     async def on_ready(self) -> None:
         friend_ids = self.get_friend_ids(self)
@@ -49,6 +51,7 @@ class MyClient(discord.Client):
             self.sleep_time,
             self.include_servers,
             self.include_channels,
+            self.max_members,
         )
         friends = self.get_friends(server_info)
         mutual_friends = self.get_mutual_friends(server_info, self.output_verbosity)
@@ -203,6 +206,7 @@ class MyClient(discord.Client):
         sleep_time: float,
         include_servers: set,
         include_channels: set,
+        max_members: int,
     ) -> dict:
         user_servers = await client.fetch_guilds()
         servers_count = len(user_servers)
@@ -261,18 +265,26 @@ class MyClient(discord.Client):
             print(f"guild_server_members: {len(guild_server_members)}")
             print(f"chunked_server_members: {len(chunked_server_members)}")
 
-            server_members_count = len(server_members)
+            server_member_count = len(server_members)
+            if server_member_count > max_members:
+                logging.info(
+                    f"The server member count of {(server_member_count)} is greater than the max member count of {(max_members)}, selecting only the first {(max_members)} members"
+                )
+
+            selected_server_member_count = min(server_member_count, max_members)
 
             server_info[server_name] = dict()
 
-            for member_idx, member in enumerate(server_members):
+            for member_idx in range(selected_server_member_count):
+                member = server_members[member_idx]
+
                 if include_servers:
                     logging.info(
-                        f"Processing {server.name} server, progress = {specific_server_count}/{len(include_servers)} servers {member_idx+1}/{server_members_count} members"
+                        f"Processing {server.name} server, progress = {specific_server_count}/{len(include_servers)} servers {member_idx+1}/{selected_server_member_count} members"
                     )
                 else:
                     logging.info(
-                        f"Processing {server.name} server, progress = {server_idx+1}/{servers_count} servers {member_idx+1}/{server_members_count} members"
+                        f"Processing {server.name} server, progress = {server_idx+1}/{servers_count} servers {member_idx+1}/{selected_server_member_count} members"
                     )
                 if member.id == client.user.id:
                     continue
@@ -425,6 +437,14 @@ def add_arguments(parser: argparse.ArgumentParser, output_path=str):
         help="If set, will run the get_token script to get a token",
     )
 
+    parser.add_argument(
+        "-m",
+        "--max_members",
+        type=int,
+        default=sys.maxsize,
+        help="Maximum number of members to process. Example --max_members 100, default=no limit",
+    )
+
 
 if __name__ == "__main__":
     # Set the default output path to the current working directory + /output/
@@ -453,5 +473,6 @@ if __name__ == "__main__":
         output_path=args.output_path,
         include_servers=args.include_servers,
         include_channels=args.include_channels,
+        max_members=args.max_members,
     )
     client.run(token)
