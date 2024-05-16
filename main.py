@@ -30,6 +30,7 @@ class MyClient(discord.Client):
         write_to_json,
         output_path,
         include_servers,
+        include_channels,
     ):
         super().__init__()
         self.sleep_time = sleep_time
@@ -38,6 +39,7 @@ class MyClient(discord.Client):
         self.write_to_json = write_to_json
         self.output_path = output_path
         self.include_servers = set(include_servers)
+        self.include_channels = set(include_channels)
 
     async def on_ready(self) -> None:
         friend_ids = self.get_friend_ids(self)
@@ -46,6 +48,7 @@ class MyClient(discord.Client):
             friend_ids,
             self.sleep_time,
             self.include_servers,
+            self.include_channels,
         )
         friends = self.get_friends(server_info)
         mutual_friends = self.get_mutual_friends(server_info, self.output_verbosity)
@@ -199,12 +202,14 @@ class MyClient(discord.Client):
         friend_ids: set,
         sleep_time: float,
         include_servers: set,
+        include_channels: set,
     ) -> dict:
         user_servers = await client.fetch_guilds()
         servers_count = len(user_servers)
         server_info = dict()
         seen_members = dict()
         include_servers = set(include_servers)
+        include_channels = set(include_channels)
         specific_server_count = 0
         matched_servers = set()
         seen_servers = set()
@@ -220,16 +225,41 @@ class MyClient(discord.Client):
                     matched_servers.add(server_name)
                     specific_server_count += 1
 
+            if include_channels:
+                channels = [
+                    discord.utils.get(server.channels, name=channel)
+                    for channel in include_channels
+                ]
+                try:
+                    fetch_server_members = set(
+                        await server.fetch_members(channels=channels)
+                    )
+                except discord.ClientException:
+                    logging.info("server.fetch_members() failed")
+                    fetch_server_members = set()
+            else:
+                try:
+                    fetch_server_members = set(await server.fetch_members())
+                except discord.ClientException:
+                    logging.info(
+                        "server.fetch_members() failed, please try specifying a 1-5 channels to fetch channels from with the -c flag"
+                    )
+                    fetch_server_members = set()
             try:
-                fetch_server_members = set(await server.fetch_members())
+                chunked_server_members = set(await server.chunk())
             except Exception:
-                fetch_server_members = set()
-
+                logging.info("server.fetch_members() failed")
+                chunked_server_members = set()
             guild_server_members = set(server.members)
-            server_members = list(fetch_server_members.union(guild_server_members))
+            server_members = list(
+                fetch_server_members.union(guild_server_members).union(
+                    chunked_server_members
+                )
+            )
 
             print(f"fetch_server_members: {len(fetch_server_members)}")
             print(f"guild_server_members: {len(guild_server_members)}")
+            print(f"chunked_server_members: {len(chunked_server_members)}")
 
             server_members_count = len(server_members)
 
@@ -311,6 +341,7 @@ class MyClient(discord.Client):
             logging.warning(
                 f"Did not find the following servers: {unmatched_servers} consider choosing from the following servers: {seen_servers}"
             )
+        sleep(sleep_time)
         return server_info
 
 
@@ -380,6 +411,14 @@ def add_arguments(parser: argparse.ArgumentParser, output_path=str):
     )
 
     parser.add_argument(
+        "-c",
+        "--include_channels",
+        default="",
+        nargs="+",
+        help="Only process the members who are in the provided channels. If not specified, tries to retrieve all server members if you have the appropriate permissions, otherwise attempts to scrape the member sidebar. Example --include_channels 'channel-1' 'channel-2' 'channel-3', default=''",
+    )
+
+    parser.add_argument(
         "-g",
         "--get_token",
         action="store_true",
@@ -413,5 +452,6 @@ if __name__ == "__main__":
         write_to_json=args.write_to_json,
         output_path=args.output_path,
         include_servers=args.include_servers,
+        include_channels=args.include_channels,
     )
     client.run(token)
