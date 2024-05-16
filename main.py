@@ -427,7 +427,7 @@ def add_arguments(parser: argparse.ArgumentParser, output_path=str):
         "--include_channels",
         default="",
         nargs="+",
-        help="Only process the members who are in the provided channels. If not specified, tries to retrieve all server members if you have the appropriate permissions, otherwise attempts to scrape the member sidebar. Example --include_channels 'channel-1' 'channel-2' 'channel-3', default=''",
+        help="Only process the members who are in the provided channels. If not specified, tries to retrieve all server members if you have the appropriate permissions, otherwise attempts to scrape the member sidebar. Example --include_channels 'general' 'help', default=''",
     )
 
     parser.add_argument(
