@@ -436,7 +436,7 @@ def add_arguments(parser: argparse.ArgumentParser, output_path=str):
     parser.add_argument(
         "-i",
         "--include_servers",
-        default="",
+        default=[],
         nargs="+",
         help="Only process servers whose names are in this list. If not specified, process all servers. Put server names with multiple words in quotes. Example --include_servers 'server 1' 'server2' 'server3', default=''",
     )
