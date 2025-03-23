@@ -10,6 +10,7 @@ import discord
 from dotenv import load_dotenv
 from get_token import get_token
 
+
 def resource_path(relative_path):
     """Get absolute path to resource, works for dev and for PyInstaller"""
     try:
@@ -18,6 +19,7 @@ def resource_path(relative_path):
     except Exception:
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
+
 
 class MyClient(discord.Client):
     def __init__(
@@ -171,7 +173,9 @@ class MyClient(discord.Client):
         print("\nMutual Servers:")
         print(json.dumps(mutual_servers, indent=4))
 
-    def write_data_to_json(self, server_info, friends, mutual_friends, mutual_servers, output_path):
+    def write_data_to_json(
+        self, server_info, friends, mutual_friends, mutual_servers, output_path
+    ):
         os.makedirs(output_path, exist_ok=True)
         with open(os.path.join(output_path, "server_info.json"), "w") as f:
             json.dump(server_info, f, indent=4)
@@ -201,8 +205,10 @@ class MyClient(discord.Client):
                     return set(await server.fetch_members())
             except discord.HTTPException as e:
                 if e.status == 429:  # Rate limit error
-                    retry_after = int(e.response.headers.get('Retry-After', 1))
-                    logging.warning(f"Rate limited. Retrying after {retry_after} seconds.")
+                    retry_after = int(e.response.headers.get("Retry-After", 1))
+                    logging.warning(
+                        f"Rate limited. Retrying after {retry_after} seconds."
+                    )
                     await asyncio.sleep(retry_after)
                     return await fetch_members_with_retry(server, channels)
                 else:
@@ -266,17 +272,19 @@ class MyClient(discord.Client):
             server_info[server_name] = dict()
 
             for start_idx in range(0, selected_server_member_count, period_max_members):
-                end_idx = min(start_idx + period_max_members, selected_server_member_count)
+                end_idx = min(
+                    start_idx + period_max_members, selected_server_member_count
+                )
                 for member_idx in range(start_idx, end_idx):
                     member = server_members[member_idx]
 
                     if include_servers:
                         logging.info(
-                            f"Processing {server.name} server, progress = {specific_server_count}/{len(include_servers)} servers {member_idx+1}/{selected_server_member_count} members"
+                            f"Processing {server.name} server, progress = {specific_server_count}/{len(include_servers)} servers {member_idx + 1}/{selected_server_member_count} members"
                         )
                     else:
                         logging.info(
-                            f"Processing {server.name} server, progress = {server_idx+1}/{servers_count} servers {member_idx+1}/{selected_server_member_count} members"
+                            f"Processing {server.name} server, progress = {server_idx + 1}/{servers_count} servers {member_idx + 1}/{selected_server_member_count} members"
                         )
                     if member.id == client.user.id:
                         continue
@@ -285,9 +293,9 @@ class MyClient(discord.Client):
 
                     if member_name in seen_members:
                         server_info[server_name][member_name] = dict()
-                        server_info[server_name][member_name]["is_friend"] = seen_members[
-                            member_name
-                        ]["is_friend"]
+                        server_info[server_name][member_name]["is_friend"] = (
+                            seen_members[member_name]["is_friend"]
+                        )
                         server_info[server_name][member_name]["mutual_friends"] = (
                             seen_members[member_name]["mutual_friends"]
                         )
@@ -306,7 +314,19 @@ class MyClient(discord.Client):
                             with_mutual_friends=True,
                         )
                     except (discord.errors.NotFound, discord.errors.InvalidData):
-                        logging.warning(f"Member {member_name} not found or no longer in the guild. Skipping.")
+                        logging.warning(
+                            f"Member {member_name} not found or invalid. Skipping."
+                        )
+                        continue
+                    except discord.errors.HTTPException as e:
+                        logging.warning(
+                            f"HTTP error fetching profile for {member_name}: {e}. Skipping."
+                        )
+                        continue
+                    except Exception as e:
+                        logging.error(
+                            f"Unexpected error fetching profile for {member_name}: {e}."
+                        )
                         continue
 
                     server_info[server_name][member_name] = dict()
@@ -355,6 +375,7 @@ class MyClient(discord.Client):
         sleep(sleep_time)
         return server_info
 
+
 def check_positive_float(original_value):
     try:
         value = float(original_value)
@@ -363,6 +384,7 @@ def check_positive_float(original_value):
     except ValueError:
         raise Exception(f"{original_value} is not an float")
     return value
+
 
 def add_arguments(parser: argparse.ArgumentParser, output_path=str):
     parser.add_argument(
@@ -455,6 +477,7 @@ def add_arguments(parser: argparse.ArgumentParser, output_path=str):
         default=300,
         help="Pause duration between periods in seconds. Example --pause_duration 300, default=300",
     )
+
 
 if __name__ == "__main__":
     # Set the default output path to the current working directory + /output/
