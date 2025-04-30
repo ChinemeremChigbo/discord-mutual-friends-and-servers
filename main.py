@@ -204,7 +204,7 @@ class MyClient(discord.Client):
                 else:
                     return set(await server.fetch_members())
             except discord.HTTPException as e:
-                if e.status == 429:  # Rate limit error
+                if e.status == 429:
                     retry_after = int(e.response.headers.get("Retry-After", 1))
                     logging.warning(
                         f"Rate limited. Retrying after {retry_after} seconds."
@@ -214,6 +214,9 @@ class MyClient(discord.Client):
                 else:
                     logging.error(f"Failed to fetch members: {e}")
                     return set()
+            except RuntimeError as e:
+                logging.warning(f"Cannot fetch members for {server.name}: {e}")
+                return set()
 
         user_servers = await client.fetch_guilds()
         servers_count = len(user_servers)
