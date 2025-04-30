@@ -362,7 +362,7 @@ class MyClient(discord.Client):
 
                     seen_members[member_name]["mutual_servers"] = mutual_server_names
 
-                    sleep(sleep_time)
+                    await asyncio.sleep(sleep_time)
 
                 logging.info(f"Pausing for {pause_duration} seconds...")
                 await asyncio.sleep(pause_duration)
@@ -372,7 +372,6 @@ class MyClient(discord.Client):
             logging.warning(
                 f"Did not find the following servers: {unmatched_servers} consider choosing from the following servers: {seen_servers}"
             )
-        sleep(sleep_time)
         return server_info
 
 
