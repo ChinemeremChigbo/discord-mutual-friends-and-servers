@@ -1,18 +1,20 @@
-import argparse
+from __future__ import annotations
+
+import asyncio
+import inspect
 import json
 import logging
 import os
-from time import sleep
 import sys
-import asyncio
+from typing import Iterable, Optional
 
 import discord
-from dotenv import load_dotenv
-from get_token import get_token
+
+DEFAULT_OUTPUT_DIR = "output"
 
 
-def resource_path(relative_path):
-    """Get absolute path to resource, works for dev and for PyInstaller"""
+def resource_path(relative_path: str) -> str:
+    """Get absolute path to resource, works for dev and for PyInstaller."""
     try:
         # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
@@ -21,21 +23,68 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
+def default_output_path() -> str:
+    return os.path.join(os.path.dirname(os.path.realpath(__file__)), DEFAULT_OUTPUT_DIR)
+
+
+def normalize_output_path(path: Optional[str]) -> str:
+    if not path:
+        path = default_output_path()
+    return os.path.abspath(os.path.expanduser(path))
+
+
+def _resolve_intents_class():
+    intents_cls = getattr(discord, "Intents", None)
+    if intents_cls is not None:
+        return intents_cls
+    try:
+        from discord import flags  # type: ignore
+    except Exception:
+        return None
+    return getattr(flags, "Intents", None)
+
+
+def build_intents():
+    intents_cls = _resolve_intents_class()
+    if intents_cls is None:
+        return None
+    intents = intents_cls.default()
+    if hasattr(intents, "guilds"):
+        intents.guilds = True
+    if hasattr(intents, "members"):
+        intents.members = True
+    if hasattr(intents, "presences"):
+        intents.presences = True
+    return intents
+
+
+def _client_supports_intents() -> bool:
+    try:
+        return "intents" in inspect.signature(discord.Client.__init__).parameters
+    except Exception:
+        return False
+
+
 class MyClient(discord.Client):
     def __init__(
         self,
-        sleep_time,
-        output_verbosity,
-        print_info,
-        write_to_json,
-        output_path,
-        include_servers,
-        include_channels,
-        max_members,
-        period_max_members,
-        pause_duration,
-    ):
-        super().__init__()
+        sleep_time: float,
+        output_verbosity: int,
+        print_info: bool,
+        write_to_json: bool,
+        output_path: str,
+        include_servers: Iterable[str],
+        include_channels: Iterable[str],
+        max_members: int,
+        period_max_members: int,
+        pause_duration: int,
+        intents: Optional[object] = None,
+    ) -> None:
+        resolved_intents = intents or build_intents()
+        if _client_supports_intents() and resolved_intents is not None:
+            super().__init__(intents=resolved_intents)
+        else:
+            super().__init__()
         self.sleep_time = sleep_time
         self.output_verbosity = output_verbosity
         self.print_info = print_info
@@ -46,7 +95,6 @@ class MyClient(discord.Client):
         self.max_members = max_members
         self.period_max_members = period_max_members
         self.pause_duration = pause_duration
-        print("MyClient initialized successfully")
 
     async def on_ready(self) -> None:
         friend_ids = self.get_friend_ids(self)
@@ -163,7 +211,7 @@ class MyClient(discord.Client):
                 ]
         return mutual_servers
 
-    def print_client_info(self, server_info, friends, mutual_friends, mutual_servers):
+    def print_client_info(self, server_info, friends, mutual_friends, mutual_servers) -> None:
         print("Server Info:")
         print(json.dumps(server_info, indent=4))
         print("\nFriends:")
@@ -175,15 +223,16 @@ class MyClient(discord.Client):
 
     def write_data_to_json(
         self, server_info, friends, mutual_friends, mutual_servers, output_path
-    ):
-        os.makedirs(output_path, exist_ok=True)
-        with open(os.path.join(output_path, "server_info.json"), "w") as f:
+    ) -> None:
+        resolved_output_path = normalize_output_path(output_path)
+        os.makedirs(resolved_output_path, exist_ok=True)
+        with open(os.path.join(resolved_output_path, "server_info.json"), "w") as f:
             json.dump(server_info, f, indent=4)
-        with open(os.path.join(output_path, "friends.json"), "w") as f:
+        with open(os.path.join(resolved_output_path, "friends.json"), "w") as f:
             json.dump(friends, f, indent=4)
-        with open(os.path.join(output_path, "mutual_friends.json"), "w") as f:
+        with open(os.path.join(resolved_output_path, "mutual_friends.json"), "w") as f:
             json.dump(mutual_friends, f, indent=4)
-        with open(os.path.join(output_path, "mutual_servers.json"), "w") as f:
+        with open(os.path.join(resolved_output_path, "mutual_servers.json"), "w") as f:
             json.dump(mutual_servers, f, indent=4)
 
     async def get_server_info(
@@ -201,8 +250,7 @@ class MyClient(discord.Client):
             try:
                 if channels:
                     return set(await server.fetch_members(channels=channels))
-                else:
-                    return set(await server.fetch_members())
+                return set(await server.fetch_members())
             except discord.HTTPException as e:
                 if e.status == 429:
                     retry_after = int(e.response.headers.get("Retry-After", 1))
@@ -211,9 +259,8 @@ class MyClient(discord.Client):
                     )
                     await asyncio.sleep(retry_after)
                     return await fetch_members_with_retry(server, channels)
-                else:
-                    logging.error(f"Failed to fetch members: {e}")
-                    return set()
+                logging.error(f"Failed to fetch members: {e}")
+                return set()
             except RuntimeError as e:
                 logging.warning(f"Cannot fetch members for {server.name}: {e}")
                 return set()
@@ -235,9 +282,8 @@ class MyClient(discord.Client):
             if include_servers:
                 if server_name not in include_servers:
                     continue
-                else:
-                    matched_servers.add(server_name)
-                    specific_server_count += 1
+                matched_servers.add(server_name)
+                specific_server_count += 1
 
             if include_channels:
                 channels = [
@@ -260,14 +306,14 @@ class MyClient(discord.Client):
                 )
             )
 
-            print(f"fetch_server_members: {len(fetch_server_members)}")
-            print(f"guild_server_members: {len(guild_server_members)}")
-            print(f"chunked_server_members: {len(chunked_server_members)}")
-
             server_member_count = len(server_members)
             if server_member_count > max_members:
                 logging.info(
-                    f"The server member count of {(server_member_count)} is greater than the max member count of {(max_members)}, selecting only the first {(max_members)} members"
+                    "The server member count of %s is greater than the max member count "
+                    "of %s, selecting only the first %s members",
+                    server_member_count,
+                    max_members,
+                    max_members,
                 )
 
             selected_server_member_count = min(server_member_count, max_members)
@@ -283,11 +329,21 @@ class MyClient(discord.Client):
 
                     if include_servers:
                         logging.info(
-                            f"Processing {server.name} server, progress = {specific_server_count}/{len(include_servers)} servers {member_idx + 1}/{selected_server_member_count} members"
+                            "Processing %s server, progress = %s/%s servers %s/%s members",
+                            server.name,
+                            specific_server_count,
+                            len(include_servers),
+                            member_idx + 1,
+                            selected_server_member_count,
                         )
                     else:
                         logging.info(
-                            f"Processing {server.name} server, progress = {server_idx + 1}/{servers_count} servers {member_idx + 1}/{selected_server_member_count} members"
+                            "Processing %s server, progress = %s/%s servers %s/%s members",
+                            server.name,
+                            server_idx + 1,
+                            servers_count,
+                            member_idx + 1,
+                            selected_server_member_count,
                         )
                     if member.id == client.user.id:
                         continue
@@ -307,8 +363,7 @@ class MyClient(discord.Client):
                             seen_members[member_name]["mutual_servers"]
                         )
                         continue
-                    else:
-                        seen_members[member_name] = dict()
+                    seen_members[member_name] = dict()
 
                     try:
                         member_profile = await server.fetch_member_profile(
@@ -318,17 +373,21 @@ class MyClient(discord.Client):
                         )
                     except (discord.errors.NotFound, discord.errors.InvalidData):
                         logging.warning(
-                            f"Member {member_name} not found or invalid. Skipping."
+                            "Member %s not found or invalid. Skipping.", member_name
                         )
                         continue
                     except discord.errors.HTTPException as e:
                         logging.warning(
-                            f"HTTP error fetching profile for {member_name}: {e}. Skipping."
+                            "HTTP error fetching profile for %s: %s. Skipping.",
+                            member_name,
+                            e,
                         )
                         continue
                     except Exception as e:
                         logging.error(
-                            f"Unexpected error fetching profile for {member_name}: {e}."
+                            "Unexpected error fetching profile for %s: %s.",
+                            member_name,
+                            e,
                         )
                         continue
 
@@ -367,149 +426,21 @@ class MyClient(discord.Client):
 
                     await asyncio.sleep(sleep_time)
 
-                logging.info(f"Pausing for {pause_duration} seconds...")
+                logging.info("Pausing for %s seconds...", pause_duration)
                 await asyncio.sleep(pause_duration)
 
         unmatched_servers = include_servers.difference(matched_servers)
         if unmatched_servers:
             logging.warning(
-                f"Did not find the following servers: {unmatched_servers} consider choosing from the following servers: {seen_servers}"
+                "Did not find the following servers: %s consider choosing from the following servers: %s",
+                unmatched_servers,
+                seen_servers,
             )
         return server_info
 
 
-def check_positive_float(original_value):
-    try:
-        value = float(original_value)
-        if value <= 0:
-            raise argparse.ArgumentTypeError(f"{original_value} is not a positive")
-    except ValueError:
-        raise Exception(f"{original_value} is not an float")
-    return value
-
-
-def add_arguments(parser: argparse.ArgumentParser, output_path=str):
-    parser.add_argument(
-        "-s",
-        "--sleep_time",
-        default=3.0,
-        type=check_positive_float,
-        help="How long to sleep between each member request. With values lower than 3, rate limits tend to be hit, which may lead to a ban. Increase if you hit a rate limit. Example --sleep_time 4, default=3",
-    )
-
-    parser.add_argument(
-        "-l",
-        "--loglevel",
-        default="info",
-        choices=["debug", "info", "warn", "warning", "error", "critical"],
-        help="Provide logging level. Example --loglevel debug, default=info",
-    )
-
-    parser.add_argument(
-        "-v",
-        "--output_verbosity",
-        default=2,
-        type=int,
-        choices=[1, 2, 3],
-        help="How much information to be included in the mutual friends and mutual servers files. 1 means just the member name. 2 means the member name and a count the member's of mutual friends or mutual servers. 3 means the member name and a list of the member's mutual friends or mutual servers. Example --output_verbosity 3, default=2",
-    )
-
-    parser.add_argument(
-        "-p",
-        "--print_info",
-        default=True,
-        help="If true, the server info, mutual friends, and mutual servers are printed to the command line. Example --print_info False, default=True",
-    )
-
-    parser.add_argument(
-        "-j",
-        "--write_to_json",
-        default=True,
-        help="If true, the server info, mutual friends, and mutual servers are written to json files. Example --write_to_json False, default=True",
-    )
-
-    parser.add_argument(
-        "-o",
-        "--output_path",
-        default=output_path,
-        help="Location for output files. Example --output_path some_directory/some_subdirectory/, default=pwd+'output'",
-    )
-
-    parser.add_argument(
-        "-i",
-        "--include_servers",
-        default=[],
-        nargs="+",
-        help="Only process servers whose names are in this list. If not specified, process all servers. Put server names with multiple words in quotes. Example --include_servers 'server 1' 'server2' 'server3', default=''",
-    )
-
-    parser.add_argument(
-        "-c",
-        "--include_channels",
-        default="",
-        nargs="+",
-        help="Only process the members who are in the provided channels. If not specified, tries to retrieve all server members if you have the appropriate permissions, otherwise attempts to scrape the member sidebar. Example --include_channels 'general' 'help', default=''",
-    )
-
-    parser.add_argument(
-        "-g",
-        "--get_token",
-        action="store_true",
-        help="If set, will run the get_token script to get a token",
-    )
-
-    parser.add_argument(
-        "-m",
-        "--max_members",
-        type=int,
-        default=sys.maxsize,
-        help="Maximum number of members to process. Example --max_members 100, default=no limit",
-    )
-
-    parser.add_argument(
-        "--period_max_members",
-        type=int,
-        default=100,
-        help="Number of members to fetch per period. Example --period_max_members 100, default=100",
-    )
-
-    parser.add_argument(
-        "--pause_duration",
-        type=int,
-        default=300,
-        help="Pause duration between periods in seconds. Example --pause_duration 300, default=300",
-    )
-
-
-if __name__ == "__main__":
-    # Set the default output path to the current working directory + /output/
-    output_path = os.path.dirname(os.path.realpath(__file__)) + "/output/"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    parser = argparse.ArgumentParser()
-    add_arguments(parser, output_path)
-    args = parser.parse_args()
-    if args.get_token:
-        get_token()
-    logging.basicConfig(level=args.loglevel.upper())
-
-    key = "TOKEN"
-    if key in os.environ:
-        del os.environ[key]
-
-    load_dotenv(verbose=True)
-    token = os.getenv(key)
-
-    client = MyClient(
-        sleep_time=args.sleep_time,
-        output_verbosity=args.output_verbosity,
-        print_info=args.print_info,
-        write_to_json=args.write_to_json,
-        output_path=args.output_path,
-        include_servers=args.include_servers,
-        include_channels=args.include_channels,
-        max_members=args.max_members,
-        period_max_members=args.period_max_members,
-        pause_duration=args.pause_duration,
-    )
+def run_client(*, token: str, **kwargs) -> None:
+    if not token:
+        raise ValueError("Discord token is required.")
+    client = MyClient(**kwargs)
     client.run(token)

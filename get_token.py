@@ -34,10 +34,10 @@ def get_username_password():
         root.geometry("%dx%d+%d+%d" % (width, height, x, y))
 
     def go_back():
-        # Adjust the path to ui.py if necessary using resource_path
-        ui_path = resource_path("ui.py")
-        # Run ui.py and close the current window
-        subprocess.Popen(['python', ui_path])
+        # Adjust the path to gui.py if necessary using resource_path
+        ui_path = resource_path("gui.py")
+        # Run gui.py and close the current window
+        subprocess.Popen(["python", ui_path])
         sys.exit()  # Exit the script
 
     def submit():
