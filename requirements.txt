@@ -1,4 +1,4 @@
-discord.py-self@git+https://github.com/dolfies/discord.py-self
-python-dotenv
-selenium
-tk
+discord.py-self==2.1.0
+python-dotenv==1.2.1
+selenium==4.40.0
+tk==0.1.0

@@ -42,7 +42,7 @@ This project is a proof of concept. Please be aware that the use of self bots is
 6. Run the CLI entry point below, or customize the command with the options in the [Command-line Options](#command-line-options) section:
 
    ```bash
-   python3 cli.py
+   python3 main.py
    ```
 
 7. Run the desktop UI locally:
@@ -95,3 +95,4 @@ Other methods that don't involve running JavaScript in the console:
 | `--max_members`      | `-m` | sys.maxsize  | Maximum number of members to process.                                                                                                                                                                                                                                                         | `--max_members 100`                                |
 | `--period_max_members` |      | 100        | Number of members to fetch per period before pausing.                                                                                                                                                                                                                                         | `--period_max_members 100`                         |
 | `--pause_duration`     |      | 300        | Pause duration between periods in seconds.                                                                                                                                                                                                                                                     | `--pause_duration 300`                             |
+| `--member_fetch_timeout` |      | 0        | Timeout in seconds for `fetch_members`/`chunk`. Use `0` to wait indefinitely.                                                                                                                                                                                                                 | `--member_fetch_timeout 30`                        |

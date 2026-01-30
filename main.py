@@ -19,6 +19,16 @@ def check_positive_float(original_value):
     return value
 
 
+def check_nonnegative_float(original_value):
+    try:
+        value = float(original_value)
+        if value < 0:
+            raise argparse.ArgumentTypeError(f"{original_value} is negative")
+    except ValueError:
+        raise Exception(f"{original_value} is not a float")
+    return value
+
+
 def add_arguments(parser: argparse.ArgumentParser, output_path: str) -> None:
     parser.add_argument(
         "-s",
@@ -137,6 +147,16 @@ def add_arguments(parser: argparse.ArgumentParser, output_path: str) -> None:
         help="Pause duration between periods in seconds. Example --pause_duration 300, default=300",
     )
 
+    parser.add_argument(
+        "--member_fetch_timeout",
+        type=check_nonnegative_float,
+        default=0,
+        help=(
+            "Timeout in seconds for fetch_members/chunk. Use 0 to wait indefinitely. "
+            "Example --member_fetch_timeout 30, default=0"
+        ),
+    )
+
 
 def main() -> None:
     output_path = os.path.dirname(os.path.realpath(__file__)) + "/output/"
@@ -169,6 +189,7 @@ def main() -> None:
         max_members=args.max_members,
         period_max_members=args.period_max_members,
         pause_duration=args.pause_duration,
+        member_fetch_timeout=args.member_fetch_timeout,
     )
 
 

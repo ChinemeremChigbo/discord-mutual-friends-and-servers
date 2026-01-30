@@ -137,6 +137,8 @@ def get_arguments():
         )
         args["period_max_members"] = 100
         args["pause_duration"] = 300
+        timeout_value = member_fetch_timeout_entry.get().strip()
+        args["member_fetch_timeout"] = float(timeout_value) if timeout_value else 0
         args["get_token"] = get_token_var.get()
 
         if not args.get("get_token"):
@@ -146,8 +148,6 @@ def get_arguments():
 
     root = tk.Tk()
     root.title("Discord-Mutual-Servers-and-Friends")
-    center_window(root)
-    root.minsize(350, 475)
     root.resizable(True, True)
 
     if tk.TkVersion >= 8.6:
@@ -191,7 +191,7 @@ def get_arguments():
     spacer_top = ttk.Frame(main_frame)
     spacer_top.pack(side="top", fill="both", expand=True)
     content_frame = ttk.Frame(main_frame)
-    content_frame.pack(pady=5)  # Adjust this value as needed for your layout
+    content_frame.pack(pady=(5, 16), padx=16)
     spacer_bottom = ttk.Frame(main_frame)
     spacer_bottom.pack(side="bottom", fill="both", expand=True)
 
@@ -374,6 +374,42 @@ def get_arguments():
         "Maximum number of members to process.",
     )
 
+    timeout_frame = ttk.Frame(content_frame)
+    timeout_frame.pack(pady=5)
+    ttk.Label(
+        timeout_frame,
+        text="Member fetch timeout (s):",
+        background=Colors.BG_COLOR,
+        foreground=Colors.FG_COLOR,
+    ).pack(side="left", padx=5)
+    member_fetch_timeout_entry = tk.Entry(
+        timeout_frame,
+        bg=entry_bg_color,
+        fg=entry_fg_color,
+        insertbackground=entry_fg_color,
+    )
+    member_fetch_timeout_entry.insert(0, "0")
+    member_fetch_timeout_entry.pack(side="left", expand=True, fill="x", padx=(5, 0))
+    member_fetch_timeout_entry.config(
+        validate="key",
+        validatecommand=(
+            root.register(lambda s: s.replace(".", "", 1).isdigit() or s == ""),
+            "%P",
+        ),
+    )
+    question_mark_timeout = ttk.Label(
+        timeout_frame,
+        text="?",
+        foreground=Colors.FG_COLOR,
+        background=Colors.BG_COLOR,
+        cursor="hand2",
+    )
+    question_mark_timeout.pack(side="left", padx=(5, 0))
+    ToolTip(
+        question_mark_timeout,
+        "Timeout in seconds for member fetch/chunk. Use 0 to wait indefinitely.",
+    )
+
     output_verbosity_options = [1, 2, 3]
     verbosity_label_frame = ttk.Frame(content_frame)
     verbosity_label_frame.pack(pady=(5, 0))
@@ -464,6 +500,12 @@ def get_arguments():
 
     toggle_token_entry()
 
+    root.update_idletasks()
+    req_width = root.winfo_reqwidth()
+    req_height = root.winfo_reqheight()
+    root.minsize(req_width, req_height)
+    center_window(root, req_width, req_height)
+
     root.mainloop()
     return args
 
@@ -539,6 +581,7 @@ def run_client_worker(args, status_queue):
             max_members=args["max_members"],
             period_max_members=args["period_max_members"],
             pause_duration=args["pause_duration"],
+            member_fetch_timeout=args["member_fetch_timeout"],
         )
     except Exception as e:
         status_queue.put(("error", str(e)))
