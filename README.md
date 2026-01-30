@@ -57,6 +57,20 @@ This project is a proof of concept. Please be aware that the use of self bots is
 pyinstaller --noconfirm gui.spec
 ```
 
+## Graph Viewer (Desktop)
+
+Generate output first (run the CLI/GUI), then launch the embedded graph:
+
+```bash
+python3 graph_view.py
+```
+
+Optional: specify a custom output path:
+
+```bash
+python3 graph_view.py --output_path /path/to/output
+```
+
 ## How to Get Your Token
 
 ### Primary Method
