@@ -2,11 +2,11 @@ import logging
 import os
 import queue
 import shlex
+import subprocess
 import sys
 import threading
 import tkinter as tk
 from tkinter import ttk
-
 from core import normalize_output_path, run_client
 from get_token import get_token
 
@@ -145,6 +145,12 @@ def get_arguments():
             args["token"] = token_entry.get()
 
         root.destroy()
+
+    def open_graph_viewer():
+        script_path = resource_path("graph_view.py")
+        if not os.path.exists(script_path):
+            return
+        subprocess.Popen([sys.executable, script_path])
 
     root = tk.Tk()
     root.title("Discord-Mutual-Servers-and-Friends")
@@ -497,6 +503,14 @@ def get_arguments():
     )
 
     submit_button.pack(pady=10)
+
+    open_graph_button = ttk.Button(
+        content_frame,
+        text="Open Graph Viewer",
+        command=open_graph_viewer,
+        style="Custom.TButton",
+    )
+    open_graph_button.pack(pady=(0, 10))
 
     toggle_token_entry()
 
