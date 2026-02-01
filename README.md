@@ -39,11 +39,37 @@ This project is a proof of concept. Please be aware that the use of self bots is
    python3 -m pip install -r requirements.txt
    ```
 
-6. Run the main Python file with the command below, or customize the command with the options in the [Command-line Options](#command-line-options) section:
+6. Run the CLI entry point below, or customize the command with the options in the [Command-line Options](#command-line-options) section:
 
    ```bash
    python3 main.py
    ```
+
+7. Run the desktop UI locally:
+
+   ```bash
+   python3 gui.py
+   ```
+
+## Building Desktop App from Source
+
+```bash
+pyinstaller --noconfirm gui.spec
+```
+
+## Graph Viewer (Desktop)
+
+Generate output first (run the CLI/GUI), then launch the embedded graph:
+
+```bash
+python3 graph_view.py
+```
+
+Optional: specify a custom output path:
+
+```bash
+python3 graph_view.py --output_path /path/to/output
+```
 
 ## How to Get Your Token
 
@@ -81,3 +107,6 @@ Other methods that don't involve running JavaScript in the console:
 | `--include_servers`  | `-i` | ""           | Only process servers whose names are in this list. If not specified, process all servers. Put server names with mutltiple words in quotes.                                                                                                                                                   | `--include_servers 'server 1' 'server2' 'server3'` |
 | `--include_channels` | `-c` | ""           | Only process the members who are in the provided channels. If not specified, tries to retrieve all server members if you have the appropriate permissions, otherwise attempts to scrape the member sidebar.                                                                                  | `--include_channels 'general' 'help'`              |
 | `--max_members`      | `-m` | sys.maxsize  | Maximum number of members to process.                                                                                                                                                                                                                                                         | `--max_members 100`                                |
+| `--period_max_members` |      | 100        | Number of members to fetch per period before pausing.                                                                                                                                                                                                                                         | `--period_max_members 100`                         |
+| `--pause_duration`     |      | 300        | Pause duration between periods in seconds.                                                                                                                                                                                                                                                     | `--pause_duration 300`                             |
+| `--member_fetch_timeout` |      | 0        | Timeout in seconds for `fetch_members`/`chunk`. Use `0` to wait indefinitely.                                                                                                                                                                                                                 | `--member_fetch_timeout 30`                        |

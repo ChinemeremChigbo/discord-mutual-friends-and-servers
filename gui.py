@@ -1,13 +1,14 @@
 import logging
 import os
-import sys
+import queue
 import shlex
+import subprocess
+import sys
+import threading
 import tkinter as tk
 from tkinter import ttk
-
+from core import normalize_output_path, run_client
 from get_token import get_token
-from main import MyClient
-import threading
 
 class Colors:
     # Define color codes
@@ -110,7 +111,7 @@ def get_arguments():
 
     def on_submit():
         args["sleep_time"] = (
-            float(sleep_time_entry.get()) if sleep_time_entry.get() else 2.0
+            float(sleep_time_entry.get()) if sleep_time_entry.get() else 3.0
         )
         args["output_verbosity"] = output_verbosity_var.get()
         args["loglevel"] = loglevel_var.get()
@@ -129,7 +130,15 @@ def get_arguments():
             if include_channels_entry.get() 
             else []
         )
-        args["max_members"] = int(max_members_entry.get()) if max_members_entry.get().isdigit() else None
+        args["max_members"] = (
+            int(max_members_entry.get())
+            if max_members_entry.get().isdigit()
+            else sys.maxsize
+        )
+        args["period_max_members"] = 100
+        args["pause_duration"] = 300
+        timeout_value = member_fetch_timeout_entry.get().strip()
+        args["member_fetch_timeout"] = float(timeout_value) if timeout_value else 0
         args["get_token"] = get_token_var.get()
 
         if not args.get("get_token"):
@@ -137,10 +146,14 @@ def get_arguments():
 
         root.destroy()
 
+    def open_graph_viewer():
+        script_path = resource_path("graph_view.py")
+        if not os.path.exists(script_path):
+            return
+        subprocess.Popen([sys.executable, script_path])
+
     root = tk.Tk()
     root.title("Discord-Mutual-Servers-and-Friends")
-    center_window(root)
-    root.minsize(350, 475)
     root.resizable(True, True)
 
     if tk.TkVersion >= 8.6:
@@ -184,7 +197,7 @@ def get_arguments():
     spacer_top = ttk.Frame(main_frame)
     spacer_top.pack(side="top", fill="both", expand=True)
     content_frame = ttk.Frame(main_frame)
-    content_frame.pack(pady=5)  # Adjust this value as needed for your layout
+    content_frame.pack(pady=(5, 16), padx=16)
     spacer_bottom = ttk.Frame(main_frame)
     spacer_bottom.pack(side="bottom", fill="both", expand=True)
 
@@ -206,7 +219,7 @@ def get_arguments():
         fg=entry_fg_color,
         insertbackground=entry_fg_color,
     )
-    sleep_time_entry.insert(0, "2.0")
+    sleep_time_entry.insert(0, "3.0")
     sleep_time_entry.pack(side="left", fill="x", padx=(5, 0))
     question_mark_sleep_time = ttk.Label(
         sleep_time_frame,
@@ -218,7 +231,7 @@ def get_arguments():
     question_mark_sleep_time.pack(side="left")
     ToolTip(
         question_mark_sleep_time,
-        "How long to sleep between each member request. With values lower than 2, rate limits tend to be hit, which may lead to a ban. Increase if you hit a rate limit.",
+        "How long to sleep between each member request. With values lower than 3, rate limits tend to be hit, which may lead to a ban. Increase if you hit a rate limit.",
     )
 
     print_info_frame = ttk.Frame(content_frame)
@@ -367,6 +380,42 @@ def get_arguments():
         "Maximum number of members to process.",
     )
 
+    timeout_frame = ttk.Frame(content_frame)
+    timeout_frame.pack(pady=5)
+    ttk.Label(
+        timeout_frame,
+        text="Member fetch timeout (s):",
+        background=Colors.BG_COLOR,
+        foreground=Colors.FG_COLOR,
+    ).pack(side="left", padx=5)
+    member_fetch_timeout_entry = tk.Entry(
+        timeout_frame,
+        bg=entry_bg_color,
+        fg=entry_fg_color,
+        insertbackground=entry_fg_color,
+    )
+    member_fetch_timeout_entry.insert(0, "0")
+    member_fetch_timeout_entry.pack(side="left", expand=True, fill="x", padx=(5, 0))
+    member_fetch_timeout_entry.config(
+        validate="key",
+        validatecommand=(
+            root.register(lambda s: s.replace(".", "", 1).isdigit() or s == ""),
+            "%P",
+        ),
+    )
+    question_mark_timeout = ttk.Label(
+        timeout_frame,
+        text="?",
+        foreground=Colors.FG_COLOR,
+        background=Colors.BG_COLOR,
+        cursor="hand2",
+    )
+    question_mark_timeout.pack(side="left", padx=(5, 0))
+    ToolTip(
+        question_mark_timeout,
+        "Timeout in seconds for member fetch/chunk. Use 0 to wait indefinitely.",
+    )
+
     output_verbosity_options = [1, 2, 3]
     verbosity_label_frame = ttk.Frame(content_frame)
     verbosity_label_frame.pack(pady=(5, 0))
@@ -455,7 +504,21 @@ def get_arguments():
 
     submit_button.pack(pady=10)
 
+    open_graph_button = ttk.Button(
+        content_frame,
+        text="Open Graph Viewer",
+        command=open_graph_viewer,
+        style="Custom.TButton",
+    )
+    open_graph_button.pack(pady=(0, 10))
+
     toggle_token_entry()
+
+    root.update_idletasks()
+    req_width = root.winfo_reqwidth()
+    req_height = root.winfo_reqheight()
+    root.minsize(req_width, req_height)
+    center_window(root, req_width, req_height)
 
     root.mainloop()
     return args
@@ -513,11 +576,15 @@ class LoadingScreen:
         self.root.quit()  # Ensure the entire application stops running
 
     def update_message(self, message, fg_color=Colors.FG_COLOR):
-            self.message_label.config(text=message, fg=fg_color)  # Update the label with the new message and foreground color
+        self.message_label.config(
+            text=message, fg=fg_color
+        )  # Update the label with the new message and foreground color
 
-def run_client(args, loading_screen):
+
+def run_client_worker(args, status_queue):
     try:
-        client = MyClient(
+        run_client(
+            token=args["token"],
             sleep_time=args["sleep_time"],
             output_verbosity=args["output_verbosity"],
             print_info=args["print_info"],
@@ -525,23 +592,30 @@ def run_client(args, loading_screen):
             output_path=args["output_path"],
             include_servers=args["include_servers"],
             include_channels=args["include_channels"],
-            max_members=args["max_members"]
+            max_members=args["max_members"],
+            period_max_members=args["period_max_members"],
+            pause_duration=args["pause_duration"],
+            member_fetch_timeout=args["member_fetch_timeout"],
         )
-        client.run(args["token"])
     except Exception as e:
-        loading_screen.update_message("Token validation failed.", Colors.FG_COLOR)
-        # Optionally log the exception or perform other error handling here
-        print(f"Error running client: {e}")
-    finally:
-        # Ensure the loading screen is closed only if the client runs successfully
-        loading_screen.close()  # Close the loading screen
-        
+        status_queue.put(("error", str(e)))
+        return
+    status_queue.put(("success", None))
 
-def on_client_complete():
+
+def on_client_complete(output_path):
+    resolved_output_path = normalize_output_path(output_path)
+    if not os.path.isdir(resolved_output_path):
+        return
+    json_files = [
+        os.path.join(resolved_output_path, f)
+        for f in os.listdir(resolved_output_path)
+        if f.endswith(".json")
+    ]
+    if not json_files:
+        return
     # Now, initiate the JSON viewer window
     json_viewer_root = tk.Tk()  # Start a new Tkinter instance for the JSON viewer
-    json_files = [os.path.join(output_path, f) for f in os.listdir(output_path) if f.endswith('.json')]
-    # print(os.listdir(output_path) , "dfkjlsa;fjdiopwa")
     JsonViewer(json_viewer_root, json_files)
     json_viewer_root.mainloop()  # Start the Tkinter loop for the JSON viewer
 
@@ -599,31 +673,53 @@ class JsonViewer:
 
         # Insert JSON file content
         for file_path in self.files:
-            resolved_file_path = resource_path(file_path)  # Ensure the path is resolved here
-            with open(resolved_file_path, 'r') as file:
+            with open(file_path, "r") as file:
                 content = file.read()
-                self.text.insert(tk.END, f"File: {resolved_file_path}\n{content}\n\n")
+                self.text.insert(tk.END, f"File: {file_path}\n{content}\n\n")
 
-if __name__ == "__main__":
-    # Set the default output path and initialize logging
-    output_path = resource_path(os.path.dirname(os.path.realpath(__file__)) + "/output/")
-    # print(output_path)
+def main() -> None:
+    output_path = os.path.dirname(os.path.realpath(__file__)) + "/output/"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    args = get_arguments()  # This needs to be adjusted to actually return args from the UI
+
+    args = get_arguments()
+    if not args:
+        return
     if args.get("get_token", False):
         args["token"] = get_token()
+
     logging.basicConfig(level=args["loglevel"].upper())
-    if "TOKEN" in os.environ:
-        del os.environ["TOKEN"]
 
-    # Show the loading screen
+    status_queue = queue.Queue()
     loading_screen = LoadingScreen()
+
+    worker = threading.Thread(
+        target=run_client_worker, args=(args, status_queue), daemon=True
+    )
+    worker.start()
+
+    def poll_status():
+        try:
+            status, payload = status_queue.get_nowait()
+        except queue.Empty:
+            loading_screen.root.after(250, poll_status)
+            return
+
+        if status == "error":
+            loading_screen.update_message("Token validation failed.", Colors.FG_COLOR)
+            print(f"Error running client: {payload}")
+            loading_screen.root.after(1500, loading_screen.root.quit)
+            return
+
+        loading_screen.root.quit()
+
     loading_screen.show()
-
-    # Start the client in a background thread
-    client_thread = threading.Thread(target=run_client, args=(args, loading_screen))
-    client_thread.start()
-
-    # Start the Tkinter loop for the loading screen
+    loading_screen.root.after(250, poll_status)
     loading_screen.root.mainloop()
-    on_client_complete()
+    loading_screen.close()
+
+    if args.get("write_to_json", True):
+        on_client_complete(args["output_path"])
+
+
+if __name__ == "__main__":
+    main()

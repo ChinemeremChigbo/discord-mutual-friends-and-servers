@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['ui.py'],
+    ['gui.py'],
     pathex=[],
     binaries=[],
-    datas=[('icon.png', '.'), ('get_token.py', '.'), ('main.py', '.')],
+    datas=[('icon.png', '.'), ('icon.ico', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -21,7 +21,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='ui',
+    name='gui',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -38,7 +38,7 @@ exe = EXE(
 )
 app = BUNDLE(
     exe,
-    name='ui.app',
+    name='gui.app',
     icon='icon.ico',
     bundle_identifier=None,
 )

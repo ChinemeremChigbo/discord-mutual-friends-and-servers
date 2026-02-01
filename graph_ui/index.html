@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mutual Graph</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="toolbar">
+        <div>
+          <h1>Mutual Graph</h1>
+          <p class="subtitle">Explore mutual friends and servers</p>
+        </div>
+        <div class="controls">
+          <label class="toggle">
+            <input type="checkbox" data-edge="membership" checked />
+            Membership
+          </label>
+          <label class="toggle">
+            <input type="checkbox" data-edge="mutual_friend" checked />
+            Mutual friends
+          </label>
+          <label class="toggle">
+            <input type="checkbox" data-edge="mutual_server" checked />
+            Mutual servers
+          </label>
+          <input id="search" type="search" placeholder="Search people or servers" />
+        </div>
+      </header>
+      <main class="stage">
+        <canvas id="graph"></canvas>
+        <div class="legend">
+          <div class="legend-item"><span class="dot user"></span> User</div>
+          <div class="legend-item"><span class="dot server"></span> Server</div>
+          <div class="legend-item"><span class="dot highlight"></span> Selection</div>
+        </div>
+      </main>
+      <div id="status" class="status">Loading graph…</div>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
